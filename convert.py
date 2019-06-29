@@ -238,6 +238,13 @@ def parseMonster(m, compendium):
     if 'senses' in m:
         senses.text = ", ".join([x for x in m['senses']])
 
+    if 'source' in m:
+        trait = ET.SubElement(monster, 'trait')
+        name = ET.SubElement(trait, 'name')
+        name.text = "Source"
+        text = ET.SubElement(trait, 'text')
+        text.text = "{} p. {}".format(
+            m['source'], m['page']) if 'page' in m and m['page'] != 0 else m['source']
     if 'trait' in m:
         for t in m['trait']:
             trait = ET.SubElement(monster, 'trait')
