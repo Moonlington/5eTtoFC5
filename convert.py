@@ -134,8 +134,13 @@ def parseMonster(m, compendium):
             typ.text = "swarm of " + \
                 convertSize(m['size'])+" " + m['type']['type'] + "s"
         else:
-            typ.text = m['type']['type'] + \
-                " (" + ", ".join(m['type']['tags']) + ")"
+            subtypes = []
+            for tag in m['type']['tags']:
+                if not isinstance(tag, dict):
+                    subtypes.append(tag)
+                else:
+                    subtypes.append(tag['prefix'] + tag['tag'])
+            typ.text = "{} ({})".format(m['type']['type'], ", ".join(subtypes))
     else:
         typ.text = m['type']
 
@@ -290,8 +295,10 @@ def parseMonster(m, compendium):
                     else:
                         for i in e["items"]:
                             text = ET.SubElement(action, 'text')
-                            text.text = "{} {}".format(
-                                i['name'], remove5eShit(i['entry']))
+                            if 'name' in i:
+                                text.text = "{}{}".format(i['name']+" ", remove5eShit(i['entry']))
+                            else:
+                                text.text = "\n".join(remove5eShit(x) for x in i)
                 else:
                     text = ET.SubElement(action, 'text')
                     text.text = remove5eShit(e)
@@ -367,9 +374,10 @@ def parseMonster(m, compendium):
                     text = ET.SubElement(trait, 'text')
                     spellbois = obj['spells']
                     t = "• {} level ({} slots): ".format(
-                        ordinal(int(level)), obj['slots']) if level != "0" else "Cantrips (at will): "
+                        ordinal(int(level)), obj['slots'] if 'slots' in obj else 0) if level != "0" else "Cantrips (at will): "
                     if level != "0":
-                        slots.append(str(obj['slots']))
+                        slots.append(
+                            str(obj['slots'] if 'slots' in obj else 0))
                     text.text = t + \
                         ", ".join([remove5eShit(e) for e in spellbois])
                     for spl in spellbois:
