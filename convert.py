@@ -121,6 +121,8 @@ def convertAlignList(s):
 
 def parseMonster(m, compendium):
     if '_copy' in m:
+        if args.verbose:
+            print("COPY: " + m['name'])
         return
     monster = ET.SubElement(compendium, 'monster')
     name = ET.SubElement(monster, 'name')

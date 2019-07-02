@@ -28,9 +28,13 @@ Done converting volosguide
 Converted 456 monsters
 ```
 
+## Disclaimer
+
+Some 5eTools monsters use their 'replace' feature, which is something that I might be able to code *someday* but isn't a thing I could do easily. Those monsters will have a seperate message appear in verbose mode.
+
 ## Version
 
-* Version 1.0
+* Version 1.2
 
 ## Contact
 
