@@ -5,7 +5,10 @@ import sys
 import os
 import argparse
 
-ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n/10%10!=1)*(n%10<4)*n%10::4])
+
+def ordinal(n): return "%d%s" % (
+    n, "tsnrhtdd"[(n / 10 % 10 != 1) * (n % 10 < 4) * n % 10::4])
+
 
 def parseRIV(m, t):
     lis = []
@@ -14,15 +17,23 @@ def parseRIV(m, t):
             if 'special' in r:
                 lis.append(r['special'])
             elif t in r:
-                lis += parseRIV(r,t)
+                lis += parseRIV(r, t)
             elif 'resist' in r:
                 lis += parseRIV(r, 'resist')
             else:
-                lis.append("{}{}{}".format(r['preNote']+" " if 'preNote' in r else "",
-                                                    ", ".join([x for x in r[t]]), " "+r['note'] if 'note' in r else ""))
+                lis.append(
+                    "{}{}{}".format(
+                        r['preNote'] +
+                        " " if 'preNote' in r else "",
+                        ", ".join(
+                            [
+                                x for x in r[t]]),
+                        " " +
+                        r['note'] if 'note' in r else ""))
         else:
             lis.append(r)
     return lis
+
 
 def remove5eShit(s):
     s = re.sub(r'{@dc (.*?)}', r'DC \1', s)
@@ -42,15 +53,15 @@ def remove5eShit(s):
 
 
 def indent(elem, level=0):
-    i = "\n" + level*"  "
-    j = "\n" + (level-1)*"  "
+    i = "\n" + level * "  "
+    j = "\n" + (level - 1) * "  "
     if len(elem):
         if not elem.text or not elem.text.strip():
             elem.text = i + "  "
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
         for subelem in elem:
-            indent(subelem, level+1)
+            indent(subelem, level + 1)
         if not elem.tail or not elem.tail.strip():
             elem.tail = j
     else:
@@ -76,7 +87,8 @@ def convertAlign(s):
             return s['special']
         else:
             if 'chance' in s:
-                return " ".join([convertAlign(x) for x in s['alignment']]) + " ({}%)".format(s['chance'])
+                return " ".join(
+                    [convertAlign(x) for x in s['alignment']]) + " ({}%)".format(s['chance'])
             return " ".join([convertAlign(x) for x in s['alignment']])
     else:
         alignment = s.upper()
@@ -101,23 +113,24 @@ def convertAlignList(s):
         if "NX" in s and "NY" in s and "N" in s:
             return "Any Neutral Alignment"
     elif len(s) == 5:
-        if not "G" in s:
+        if "G" not in s:
             return "Any Non-Good Alignment"
-        elif not "E" in s:
+        elif "E" not in s:
             return "Any Non-Evil Alignment"
-        elif not "L" in s:
+        elif "L" not in s:
             return "Any Non-Lawful Alignment"
-        elif not "C" in s:
+        elif "C" not in s:
             return "Any Non-Chaotic Alignment"
     elif len(s) == 4:
-        if not "L" in s and not "NX"in s:
+        if "L" not in s and not "NX" in s:
             return "Any Chaotic Alignment"
-        if not "G" in s and not "NY"in s:
+        if "G" not in s and not "NY" in s:
             return "Any Evil Alignment"
-        if not "C" in s and not "NX"in s:
+        if "C" not in s and not "NX" in s:
             return "Any Lawful Alignment"
-        if not "E" in s and not "NY"in s:
+        if "E" not in s and not "NY" in s:
             return "Any Good Alignment"
+
 
 def parseMonster(m, compendium):
     if '_copy' in m:
@@ -134,7 +147,7 @@ def parseMonster(m, compendium):
     if isinstance(m['type'], dict):
         if 'swarmSize' in m['type']:
             typ.text = "swarm of " + \
-                convertSize(m['size'])+" " + m['type']['type'] + "s"
+                convertSize(m['size']) + " " + m['type']['type'] + "s"
         else:
             subtypes = []
             for tag in m['type']['tags']:
@@ -177,13 +190,25 @@ def parseMonster(m, compendium):
                 lis.append(str(value) + " ft.")
             elif key == "choose":
                 value['from'].insert(-1, 'or')
-                lis.append("{} {} ft.".format(", ".join(value['from']), value['amount']))
+                lis.append(
+                    "{} {} ft.".format(
+                        ", ".join(
+                            value['from']),
+                        value['amount']))
             else:
                 lis.append("{} {} ft.".format(key, value))
         speed.text = "; ".join(lis)
     else:
-        speed.text = ", ".join(["{} {} ft.".format(key, value['number'] if isinstance(value, dict) else value)
-                                for key, value in m['speed'].items() if not isinstance(value, bool)])
+        speed.text = ", ".join(
+            [
+                "{} {} ft.".format(
+                    key,
+                    value['number'] if isinstance(
+                        value,
+                        dict) else value) for key,
+                value in m['speed'].items() if not isinstance(
+                    value,
+                    bool)])
 
     statstr = ET.SubElement(monster, 'str')
     statstr.text = str(m['str'])
@@ -200,13 +225,13 @@ def parseMonster(m, compendium):
 
     save = ET.SubElement(monster, 'save')
     if 'save' in m:
-        save.text = ", ".join(["{} {}".format(str.capitalize(key), value)
-                            for key, value in m['save'].items()])
+        save.text = ", ".join(["{} {}".format(str.capitalize(
+            key), value) for key, value in m['save'].items()])
 
     skill = ET.SubElement(monster, 'skill')
     if 'skill' in m:
-        skill.text = ", ".join(["{} {}".format(str.capitalize(key), value)
-                                for key, value in m['skill'].items()])
+        skill.text = ", ".join(["{} {}".format(str.capitalize(
+            key), value) for key, value in m['skill'].items()])
 
     passive = ET.SubElement(monster, 'passive')
     passive.text = str(m['passive'])
@@ -233,7 +258,7 @@ def parseMonster(m, compendium):
 
     vulnerable = ET.SubElement(monster, 'vulnerable')
     if 'vulnerable' in m:
-        vulnerablelist = parseRIV(m,'vulnerable')
+        vulnerablelist = parseRIV(m, 'vulnerable')
         vulnerable.text = "; ".join(vulnerablelist)
 
     conditionImmune = ET.SubElement(monster, 'conditionImmune')
@@ -260,16 +285,21 @@ def parseMonster(m, compendium):
             for e in t['entries']:
                 if "colLabels" in e:
                     text = ET.SubElement(trait, 'text')
-                    text.text = " | ".join([remove5eShit(x) for x in e['colLabels']])
+                    text.text = " | ".join([remove5eShit(x)
+                                            for x in e['colLabels']])
                     for row in e['rows']:
-                            rowthing = []
-                            for r in row:
-                                if isinstance(r, dict) and 'roll' in r:
-                                    rowthing.append("{}-{}".format(r['roll']['min'], r['roll']['max']) if 'min' in r['roll'] else str(r['roll']['exact']))
-                                else:
-                                    rowthing.append(remove5eShit(r))
-                            text = ET.SubElement(trait, 'text')
-                            text.text = " | ".join(rowthing)
+                        rowthing = []
+                        for r in row:
+                            if isinstance(r, dict) and 'roll' in r:
+                                rowthing.append(
+                                    "{}-{}".format(
+                                        r['roll']['min'],
+                                        r['roll']['max']) if 'min' in r['roll'] else str(
+                                        r['roll']['exact']))
+                            else:
+                                rowthing.append(remove5eShit(r))
+                        text = ET.SubElement(trait, 'text')
+                        text.text = " | ".join(rowthing)
                 else:
                     text = ET.SubElement(trait, 'text')
                     text.text = remove5eShit(e)
@@ -283,13 +313,17 @@ def parseMonster(m, compendium):
                 if isinstance(e, dict):
                     if "colLabels" in e:
                         text = ET.SubElement(action, 'text')
-                        text.text = " | ".join([remove5eShit(x) for x in e['colLabels']])
+                        text.text = " | ".join(
+                            [remove5eShit(x) for x in e['colLabels']])
                         for row in e['rows']:
                             rowthing = []
                             for r in row:
                                 if isinstance(r, dict) and 'roll' in r:
                                     rowthing.append(
-                                        "{}-{}".format(r['roll']['min'], r['roll']['max']) if 'min' in r['roll'] else str(r['roll']['exact']))
+                                        "{}-{}".format(
+                                            r['roll']['min'],
+                                            r['roll']['max']) if 'min' in r['roll'] else str(
+                                            r['roll']['exact']))
                                 else:
                                     rowthing.append(remove5eShit(r))
                             text = ET.SubElement(action, 'text')
@@ -298,9 +332,11 @@ def parseMonster(m, compendium):
                         for i in e["items"]:
                             text = ET.SubElement(action, 'text')
                             if 'name' in i:
-                                text.text = "{}{}".format(i['name']+" ", remove5eShit(i['entry']))
+                                text.text = "{}{}".format(
+                                    i['name'] + " ", remove5eShit(i['entry']))
                             else:
-                                text.text = "\n".join(remove5eShit(x) for x in i)
+                                text.text = "\n".join(
+                                    remove5eShit(x) for x in i)
                 else:
                     text = ET.SubElement(action, 'text')
                     text.text = remove5eShit(e)
@@ -321,7 +357,10 @@ def parseMonster(m, compendium):
                             for r in row:
                                 if isinstance(r, dict) and 'roll' in r:
                                     rowthing.append(
-                                        "{}-{}".format(r['roll']['min'], r['roll']['max']) if 'min' in r['roll'] else str(r['roll']['exact']))
+                                        "{}-{}".format(
+                                            r['roll']['min'],
+                                            r['roll']['max']) if 'min' in r['roll'] else str(
+                                            r['roll']['exact']))
                                 else:
                                     rowthing.append(remove5eShit(r))
                             text = ET.SubElement(legendary, 'text')
@@ -353,7 +392,7 @@ def parseMonster(m, compendium):
                 for spl in willspells:
                     search = re.search(
                         r'{@spell+ (.*?)(\|.*)?}', spl, re.IGNORECASE)
-                    if search != None:
+                    if search is not None:
                         spells.append(search.group(1))
 
             if "daily" in s:
@@ -367,7 +406,7 @@ def parseMonster(m, compendium):
                     for spl in dailyspells:
                         search = re.search(
                             r'{@spell+ (.*?)(\|.*)?}', spl, re.IGNORECASE)
-                        if search != None:
+                        if search is not None:
                             spells.append(search.group(1))
 
             if "spells" in s:
@@ -376,7 +415,9 @@ def parseMonster(m, compendium):
                     text = ET.SubElement(trait, 'text')
                     spellbois = obj['spells']
                     t = "• {} level ({} slots): ".format(
-                        ordinal(int(level)), obj['slots'] if 'slots' in obj else 0) if level != "0" else "Cantrips (at will): "
+                        ordinal(
+                            int(level)),
+                        obj['slots'] if 'slots' in obj else 0) if level != "0" else "Cantrips (at will): "
                     if level != "0":
                         slots.append(
                             str(obj['slots'] if 'slots' in obj else 0))
@@ -385,7 +426,7 @@ def parseMonster(m, compendium):
                     for spl in spellbois:
                         search = re.search(
                             r'{@spell+ (.*?)(\|.*)?}', spl, re.IGNORECASE)
-                        if search != None:
+                        if search is not None:
                             spells.append(search.group(1))
                 slotse = ET.SubElement(monster, 'slots')
                 slotse.text = ", ".join(slots)
@@ -398,12 +439,31 @@ def parseMonster(m, compendium):
         environment.text = ", ".join([x for x in m['environment']])
     # print(m['name'])
 
+
 # Argument Parser
-parser = argparse.ArgumentParser(description="Converts 5eTools json files to FC5 compatible XML files.")
+parser = argparse.ArgumentParser(
+    description="Converts 5eTools json files to FC5 compatible XML files.")
 parser.add_argument('inputJSON', nargs="+", type=str, help="5eTools inputs")
-parser.add_argument('--ignore', dest="IE", action='store_const', const=True, default=False, help="ignores errors (default: false)")
-parser.add_argument('-v', dest="verbose", action='store_const', const=True, default=False, help="verbose output (default: false)")
-parser.add_argument('-o', dest="combinedoutput", action='store', default=False, help="combines inputs into given output (default: false)")
+parser.add_argument(
+    '--ignore',
+    dest="IE",
+    action='store_const',
+    const=True,
+    default=False,
+    help="ignores errors (default: false)")
+parser.add_argument(
+    '-v',
+    dest="verbose",
+    action='store_const',
+    const=True,
+    default=False,
+    help="verbose output (default: false)")
+parser.add_argument(
+    '-o',
+    dest="combinedoutput",
+    action='store',
+    default=False,
+    help="combines inputs into given output (default: false)")
 args = parser.parse_args()
 
 if args.combinedoutput:
@@ -420,7 +480,9 @@ for file in args.inputJSON:
     ignoreError = args.IE
     if not args.combinedoutput:
         # Building XML file
-        compendium = ET.Element('compendium', {'version': "5", 'auto_indent': "NO"})
+        compendium = ET.Element(
+            'compendium', {
+                'version': "5", 'auto_indent': "NO"})
         wins = 0
         loss = 0
     for m in d['monster']:
@@ -433,19 +495,25 @@ for file in args.inputJSON:
                 loss += 1
                 continue
         else:
-            if args.verbose: 
+            if args.verbose:
                 print("Parsing " + m['name'])
             parseMonster(m, compendium)
             wins += 1
     print("Done converting " + os.path.splitext(file)[0])
 
     if not args.combinedoutput:
-        print("Converted {}/{} monsters (failed {})".format(wins,wins+loss,loss) if ignoreError else "Converted {} monsters".format(wins))
+        print("Converted {}/{} monsters (failed {})".format(wins, wins +
+                                                            loss, loss) if ignoreError else "Converted {} monsters".format(wins))
         # write to file
         tree = ET.ElementTree(indent(compendium, 1))
-        tree.write(os.path.splitext(file)[0] + ".xml", xml_declaration=True, encoding='utf-8')
+        tree.write(
+            os.path.splitext(file)[0] +
+            ".xml",
+            xml_declaration=True,
+            encoding='utf-8')
 if args.combinedoutput:
-    print("Converted {}/{} monsters (failed {})".format(wins,wins+loss,loss) if ignoreError else "Converted {} monsters".format(wins))
+    print("Converted {}/{} monsters (failed {})".format(wins, wins + loss,
+                                                        loss) if ignoreError else "Converted {} monsters".format(wins))
     # write to file
     tree = ET.ElementTree(indent(compendium, 1))
     tree.write(args.combinedoutput, xml_declaration=True, encoding='utf-8')
