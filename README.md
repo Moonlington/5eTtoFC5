@@ -19,6 +19,8 @@ optional arguments:
   -o COMBINEDOUTPUT  combines inputs into given output (default: false)
 ```
 
+You are required to download the repo as a zip or download all files, just downloading convert.py is not enough.
+
 ## Example
 
 ```bash
