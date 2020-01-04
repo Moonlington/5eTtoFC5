@@ -395,13 +395,31 @@ def modRepl(s,r,w,f):
     return s
 
 def fixTags(s,m):
+    if '<$' not in s:
+        return s
     name = m['name']
     if 'isNpc' in m and m['isNpc']:
         nameparts = name.split(" ")
         name = nameparts[0]
     s = re.sub(re.escape('<$title_name$>'), name, s)
     s = re.sub(re.escape('<$short_name$>'), name, s)
+    s = re.sub(re.escape('<$damage_avg__2.5+str$>'), "{:d}".format(math.floor(2.5+getAbilityMod(m["str"]))), s)
+    s = re.sub(re.escape('<$damage_mod__str$>'), " {:+d}".format(getAbilityMod(m["str"])) if getAbilityMod(m["str"]) != 0 else "", s)
+    s = re.sub(re.escape('<$spell_dc__cha$>'), "{:d}".format(8+crToP(m["cr"])+getAbilityMod(m["cha"])), s)
+    s = re.sub(re.escape('<$to_hit__str$>'), "{:+d}".format(crToP(m["cr"])+getAbilityMod(m["str"])), s)
+
     return s
+
+def crToP(cr):
+    if "/" in cr:
+        fraction = list(map(float,cr.split("/",2)))
+        cr = fraction[0]/fraction[1]
+    else:
+        cr = float(cr)
+    return math.ceil(1+cr/4)
+
+def getAbilityMod(score):
+    return math.floor((float(score)-10)/2)
 
 def multiCR(cr,scale):
     if type(cr) == dict:
