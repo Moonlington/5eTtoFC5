@@ -3,6 +3,7 @@ import re
 import utils
 import json
 import os
+import copy
 from slugify import slugify
 from wand.image import Image
 
@@ -15,7 +16,7 @@ def parseMonster(m, compendium, args):
             with open(xtrsrc) as f:
                 d = json.load(f)
                 f.close()
-            mcpy = m
+            mcpy = copy.deepcopy(m)
             for mn in d['monster']:
                 if mn['name'] == mcpy['_copy']['name']:
                     if '_copy' in mn:
@@ -27,9 +28,9 @@ def parseMonster(m, compendium, args):
                             f.close()
                         for mn2 in d2['monster']:
                             if mn2['name'] == mn['_copy']['name']:
-                                mn = mn2
+                                mn = copy.deepcopy(mn2)
                                 break
-                    m = mn
+                    m = copy.deepcopy(mn)
                     m['name'] = mcpy['name']
                     if 'isNpc' in mcpy:
                         m['isNpc'] = mcpy['isNpc']

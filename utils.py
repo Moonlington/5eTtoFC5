@@ -43,6 +43,8 @@ def remove5eShit(s):
     s = re.sub(r'{@h}', r'', s)
     s = re.sub(r'{@recharge (.*?)}', r'(Recharge \1-6)', s)
     s = re.sub(r'{@recharge}', r'(Recharge 6)', s)
+    s = re.sub(r'{@spell (.*?)}', r'<spell>\1</spell>', s)
+    s = re.sub(r'{@link (.*?)\|(.*?)?}', r'<a href="\2">\1</a>', s)
     s = re.sub(r'{@\w+ (.*?)(\|.*?)?}', r'\1', s)
     return s.strip()
 
@@ -248,6 +250,16 @@ def modifyMonster(m,mods):
             print(m["name"],m["source"])
     return m
 
+def modifyItem(m,mods):
+    for mod in mods:
+        if mod == 'entries':
+            if mod not in m:
+                m[mod] = []
+            m[mod] = modList(m[mod],mods[mod])
+        else:
+            print("Unhandled mod: " + mod)
+    return m
+
 def modTraits(trait,mod):
     if type(mod) == list:
         for mt in range(len(mod)):
@@ -395,6 +407,27 @@ def modRepl(s,r,w,f):
     return s
 
 def fixTags(s,m):
+    if '{=' in s:
+        def propRepl(matchobj):
+            if matchobj.group(1) in m:
+                flags = matchobj.group(2)
+                repl = m[matchobj.group(1)]
+                if not flags == None:
+                    if 'a' in flags:
+                        if repl[0].lower() in 'aeiou':
+                            repl = 'an'
+                        else:
+                            repl = 'a'
+                    if 'l' in flags:
+                        repl = repl.lower()
+                    if 't' in flags:
+                        repl = repl.title()
+                return repl
+            else:
+                return matchobj.group(1)
+        s = re.sub(r'{=(.*?)([/].*?)?}', propRepl, s)
+    if '{@' in s:
+        s = remove5eShit(s)
     if '<$' not in s:
         return s
     name = m['name']
@@ -407,7 +440,8 @@ def fixTags(s,m):
     s = re.sub(re.escape('<$damage_mod__str$>'), " {:+d}".format(getAbilityMod(m["str"])) if getAbilityMod(m["str"]) != 0 else "", s)
     s = re.sub(re.escape('<$spell_dc__cha$>'), "{:d}".format(8+crToP(m["cr"])+getAbilityMod(m["cha"])), s)
     s = re.sub(re.escape('<$to_hit__str$>'), "{:+d}".format(crToP(m["cr"])+getAbilityMod(m["str"])), s)
-
+    if re.search(r'{[@=](.*?)}',s):
+        s = fixTags(s,m)
     return s
 
 def crToP(cr):
