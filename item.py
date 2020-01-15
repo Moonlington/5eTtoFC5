@@ -197,7 +197,9 @@ def parseItem(m, compendium, args):
 
     if 'source' in m:
         slug = slugify(m["name"])
-        if os.path.isdir("./items/") and os.path.isdir("./img") and not os.path.isfile("./items/" + slug + ".jpg"):
+        if args.addimgs and os.path.isdir("./img") and not os.path.isfile("./items/" + slug + ".png"):
+            if not os.path.isdir("./items/"):
+                os.mkdir("./items/")
             artworkpath = None
             if os.path.isfile("./img/items/" + m["name"] + ".jpg"):
                 artworkpath = "./img/items/" + m["name"] + ".jpg"
@@ -209,119 +211,33 @@ def parseItem(m, compendium, args):
                 if args.verbose:
                     print("Converting Image: " + artworkpath)
                 with Image(filename=artworkpath) as img:
-                    img.format='jpeg'
-                    img.save(filename="./items/" + slug + ".jpg")
+                    img.format='png'
+                    img.save(filename="./items/" + slug + ".png")
                     imagetag = ET.SubElement(itm, 'image')
-                    imagetag.text = slug + ".jpg"
-        elif os.path.isfile("./items/" + slug + ".jpg"):
+                    imagetag.text = slug + ".png"
+        elif os.path.isfile("./items/" + slug + ".png"):
             imagetag = ET.SubElement(itm, 'image')
-            imagetag.text = slug + ".jpg"
+            imagetag.text = slug + ".png"
 
-        allbooks = [ "./data/books.json", "./data/adventures.json" ]
-        srcfound = True
-        if m["source"] == "TftYP":
-            m["source"] = "Tales from the Yawning Portal"
-        elif m["source"] == "PSA":
-            m["source"] = "Plane Shift: Amonkhet"
-        elif m["source"] == "PSD":
-            m["source"] = "Plane Shift: Dominaria"
-        elif m["source"] == "PSI":
-            m["source"] = "Plane Shift: Innistrad"
-        elif m["source"] == "PSK":
-            m["source"] = "Plane Shift: Kaladesh"
-        elif m["source"] == "PSX":
-            m["source"] = "Plane Shift: Ixalan"
-        elif m["source"] == "PSZ":
-            m["source"] = "Plane Shift: Zendikar"
-        elif m["source"] == "Mag":
-            m["source"] = "Dragon Magazine"
-        elif m["source"] == "MFF":
-            m["source"] = "Mordenkainen’s Fiendish Folio"
-        elif m["source"] == "Stream":
-            m["source"] = "Livestream"
-        elif m["source"].startswith("UA"):
-            m["source"] = re.sub(r"(\w)([A-Z])", r"\1 \2", m["source"])
-            m["source"] = re.sub(r"U A", r"Unearthed Arcana: ", m["source"])
-        else:
-            srcfound = False
-        for books in allbooks:
-            if srcfound:
-                break
-            try:
-                with open(books) as f:
-                    bks = json.load(f)
-                    f.close()
-                key = list(bks.keys())[0]
-                for bk in bks[key]:
-                    if bk['source'] == m['source']:
-                        m["source"] = bk['name']
-                        srcfound = True
-                        break
-            except IOError as e:
-                if args.verbose:
-                    print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-        if not srcfound and args.verbose:
-            print("Could not find source: " + m['source'])
         source = ET.SubElement(itm, 'source')
         source.text = "{} p. {}".format(
-            m['source'], m['page']) if 'page' in m and m['page'] != 0 else m['source']
+            utils.getFriendlySource(m['source']), m['page']) if 'page' in m and m['page'] != 0 else utils.getFriendlySource(m['source'])
 
         if 'otherSources' in m and m["otherSources"] is not None:
-            allbooks = [ "./data/books.json", "./data/adventures.json" ]
-            srcfound = True
             for s in m["otherSources"]:
-                if "source" not in s:
-                    continue
-                if s["source"] == "TftYP":
-                    s["source"] = "Tales from the Yawning Portal"
-                elif s["source"] == "PSA":
-                    s["source"] = "Plane Shift: Amonkhet"
-                elif s["source"] == "PSD":
-                    s["source"] = "Plane Shift: Dominaria"
-                elif s["source"] == "PSI":
-                    s["source"] = "Plane Shift: Innistrad"
-                elif s["source"] == "PSK":
-                    s["source"] = "Plane Shift: Kaladesh"
-                elif s["source"] == "PSX":
-                    s["source"] = "Plane Shift: Ixalan"
-                elif s["source"] == "PSZ":
-                    s["source"] = "Plane Shift: Zendikar"
-                elif s["source"] == "Mag":
-                    s["source"] = "Dragon Magazine"
-                elif s["source"] == "MFF":
-                    s["source"] = "Mordenkainen’s Fiendish Folio"
-                elif s["source"] == "Stream":
-                    s["source"] = "Livestream"
-                elif s["source"].startswith("UA"):
-                    s["source"] = re.sub(r"(\w)([A-Z])", r"\1 \2", s["source"])
-                    s["source"] = re.sub(r"U A", r"Unearthed Arcana: ", s["source"])
-                else:
-                    srcfound = False
-                for books in allbooks:
-                    if srcfound:
-                        break
-                    try:
-                        with open(books) as f:
-                            bks = json.load(f)
-                            f.close()
-                        key = list(bks.keys())[0]
-                        for bk in bks[key]:
-                            if bk['source'] == s["source"]:
-                                s["source"] = bk['name']
-                                srcfound = True
-                                break
-                    except IOError as e:
-                        if args.verbose:
-                            print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-                if not srcfound and args.verbose:
-                    print("Could not find source: " + s["source"])
                 source.text += ", "
                 source.text += "{} p. {}".format(
-                    s["source"], s["page"]) if 'page' in s and s["page"] != 0 else s["source"]
+                    utils.getFriendlySource(s["source"]), s["page"]) if 'page' in s and s["page"] != 0 else utils.getFriendlySource(s["source"])
         if 'entries' in m:
-            m['entries'].append("<i>Source: {}</i>".format(source.text))
+            if args.nohtml:
+                m['entries'].append("Source: {}".format(source.text))
+            else:
+                m['entries'].append("<i>Source: {}</i>".format(source.text))
         else:
-            m['entries'] = ["<i>Source: {}</i>".format(source.text)]
+            if args.nohtml:
+                m['entries'] = ["Source: {}".format(source.text)]
+            else:
+                m['entries'] = ["<i>Source: {}</i>".format(source.text)]
     bodyText = ET.SubElement(itm, 'text')
     bodyText.text = ""
 
@@ -347,25 +263,25 @@ def parseItem(m, compendium, args):
                 subentries = []                    
                 for sube in e["entries"]:
                     if type(sube) == str:
-                        subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
+                        subentries.append(utils.fixTags(sube,m,args.nohtml))
                     elif type(sube) == dict and "text" in sube:
-                        subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                        subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                 bodyText.text += "\n".join(subentries)
             else:
                 if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
                     for item in e["items"]:
-                        bodyText.text += "{}: {}".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m))) + "\n"
+                        bodyText.text += "{}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)) + "\n"
                 elif type(e) == dict and e["type"] == "list":
                     for item in e["items"]:
                         if "entries" in item:
                             subentries = []                    
                             for sube in item["entries"]:
                                 if type(sube) == str:
-                                    subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
+                                    subentries.append(utils.fixTags(sube,m,args.nohtml))
                                 elif type(sube) == dict and "text" in sube:
-                                    subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                    subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                                     bodyText.text += "\n".join(subentries) + "\n"
                         else:
-                            bodyText.text += "{}".format(utils.remove5eShit(utils.fixTags(item,m))) + "\n"
+                            bodyText.text += "{}".format(utils.fixTags(item,m,args.nohtml)) + "\n"
                 else:
-                    bodyText.text += utils.remove5eShit(utils.fixTags(e,m)) + "\n"
+                    bodyText.text += utils.fixTags(e,m,args.nohtml) + "\n"

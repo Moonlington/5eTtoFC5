@@ -1,5 +1,8 @@
 import re
 import math
+import copy
+import json
+from slugify import slugify
 
 def ordinal(n): return "%d%s" % (
     n, "tsnrhtdd"[(n / 10 % 10 != 1) * (n % 10 < 4) * n % 10::4])
@@ -31,6 +34,8 @@ def parseRIV(m, t):
 
 
 def remove5eShit(s):
+    if type(s) == int or type(s) == float:
+        return str(s)
     s = re.sub(r'{@dc (.*?)}', r'DC \1', s)
     s = re.sub(r'{@hit \+?(.*?)}', r'+\1', s)
     s = re.sub(r'{@atk mw}', r'Melee Weapon Attack:', s)
@@ -43,9 +48,11 @@ def remove5eShit(s):
     s = re.sub(r'{@h}', r'', s)
     s = re.sub(r'{@recharge (.*?)}', r'(Recharge \1-6)', s)
     s = re.sub(r'{@recharge}', r'(Recharge 6)', s)
-    s = re.sub(r'{@spell (.*?)}', r'<spell>\1</spell>', s)
-    s = re.sub(r'{@link (.*?)\|(.*?)?}', r'<a href="\2">\1</a>', s)
-    s = re.sub(r'{@\w+ (.*?)(\|.*?)?}', r'\1', s)
+    s = re.sub(r'{@dice (.*?)}', r'\1', s)
+    s = re.sub(r'{@scaledice (.*?)\|(.*?)\|(.*?)}', r'\3', s)
+    s = re.sub(r'{@filter (.*?)(\|.*?)?}', r'\1', s)
+    s = re.sub(r'{@\w+ ([^{]*?)(\|[^{]*?)?}', r'\1', s)
+    s = re.sub(r'{@\w+ ((.*?|{.*?})?)(\|(.*?|{.*?})?)?}', r'\1', s)
     return s.strip()
 
 
@@ -406,7 +413,7 @@ def modRepl(s,r,w,f):
             s[i] = modRepl(s[i],r,w,f)
     return s
 
-def fixTags(s,m):
+def fixTags(s,m,nohtml=False):
     if '{=' in s:
         def propRepl(matchobj):
             if matchobj.group(1) in m:
@@ -426,10 +433,23 @@ def fixTags(s,m):
             else:
                 return matchobj.group(1)
         s = re.sub(r'{=(.*?)([/].*?)?}', propRepl, s)
+    if not nohtml:
+        s = re.sub(r'{@spell (.*?)}', r'<spell>\1</spell>', s)
+        s = re.sub(r'{@link (.*?)\|(.*?)?}', r'<a href="\2">\1</a>', s)
+        def createMLink(matchobj):
+            return "<a href=\"/monster/{}\">{}</a>".format(slugify(matchobj.group(1)),matchobj.group(2))
+        s = re.sub(r'{@creature (.*?)\|\|(.*?)?}', createMLink, s)
+        s = re.sub(r'{@creature (.*?)}', r'<monster>\1</monster>', s)
+        s = re.sub(r'{@item (.*?)(\|.*?)?}', r'<item>\1</item>', s)
+    else:
+        s = re.sub(r'{@link (.*?)\|(.*?)?}', r'\1 (\2)', s)
+
     if '{@' in s:
         s = remove5eShit(s)
+
     if '<$' not in s:
         return s
+
     name = m['name']
     if 'isNpc' in m and m['isNpc']:
         nameparts = name.split(" ")
@@ -440,8 +460,10 @@ def fixTags(s,m):
     s = re.sub(re.escape('<$damage_mod__str$>'), " {:+d}".format(getAbilityMod(m["str"])) if getAbilityMod(m["str"]) != 0 else "", s)
     s = re.sub(re.escape('<$spell_dc__cha$>'), "{:d}".format(8+crToP(m["cr"])+getAbilityMod(m["cha"])), s)
     s = re.sub(re.escape('<$to_hit__str$>'), "{:+d}".format(crToP(m["cr"])+getAbilityMod(m["str"])), s)
+
     if re.search(r'{[@=](.*?)}',s):
         s = fixTags(s,m)
+
     return s
 
 def crToP(cr):
@@ -477,3 +499,92 @@ def multiCR(cr,scale):
         else:
             cr = '{:.0f}'.format(cr)
     return cr
+
+def appendFluff(fluff,m):
+    entries = []
+    for f in fluff['monster']:
+        if f['name'] == m:
+            if 'entries' in f:
+                for e in f['entries']:
+                    if type(e) == dict and 'entries' in e and any('entries' in se for se in e['entries']):
+                        for se in e['entries']:
+                            if type(se) == dict and 'entries' in se:
+                                if 'name' in se: entries.append("<b>{}</b>".format(se['name']))
+                                entries += (se['entries'])
+                    else:
+                        entries.append(e)
+            elif "_copy" in f:
+                entries = appendFluff(fluff,f['_copy']['name'])
+            if "_appendCopy" in f:
+                entries = entries + appendFluff(fluff,f['_appendCopy']['name'])
+    return entries
+
+def findFluffImage(fluff,m):
+    for f in fluff['monster']:
+        if f['name'] == m:
+            if 'images' in f:
+                for image in f['images']:
+                    if 'href' in image and 'path' in image['href']:
+                        return image['href']['path']
+            elif "_copy" in f:
+                return findFluffImage(fluff,(f['_copy']['name']))
+    return None
+
+
+def getFriendlySource(source):
+    friendly = source
+    allbooks = [ "./data/books.json", "./data/adventures.json" ]
+    srcfound = True
+    if source == "TftYP":
+        friendly = "Tales from the Yawning Portal"
+    elif source == "PSA":
+        friendly = "Plane Shift: Amonkhet"
+    elif source == "PSD":
+        friendly = "Plane Shift: Dominaria"
+    elif source == "PSI":
+        friendly = "Plane Shift: Innistrad"
+    elif source == "PSK":
+        friendly = "Plane Shift: Kaladesh"
+    elif source == "PSX":
+        friendly = "Plane Shift: Ixalan"
+    elif source == "PSZ":
+        friendly = "Plane Shift: Zendikar"
+    elif source == "Mag":
+        friendly = "Dragon Magazine"
+    elif source == "MFF":
+        friendly = "Mordenkainen’s Fiendish Folio"
+    elif source == "Stream":
+        friendly = "Livestream"
+    elif source == "EEPC":
+        friendly = "Elemental Evil Player's Companion"
+    elif source == "RoTOS":
+        friendly = "The Rise of Tiamat Online Supplement"
+    elif source == "EET":
+        friendly = "Elemental Evil: Trinkets"
+    elif source == "UAWGE":
+        friendly = "Wayfinder's Guide to Eberron"
+    elif source == "SADS":
+        friendly = "Sapphire Anniversary Dice Set"
+    elif source.startswith("UA"):
+        friendly = re.sub(r"(\w)([A-Z])", r"\1 \2", friendly)
+        friendly = re.sub(r"U A", r"Unearthed Arcana: ", friendly)
+    else:
+        srcfound = False
+    for books in allbooks:
+        if srcfound:
+            break
+        try:
+            with open(books) as f:
+                bks = json.load(f)
+                f.close()
+            key = list(bks.keys())[0]
+            for bk in bks[key]:
+                if bk['source'] == source:
+                    friendly = bk['name']
+                    srcfound = True
+                    break
+        except IOError as e:
+            print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
+    if not srcfound:
+        print("Could not find source: " + source)
+    return friendly

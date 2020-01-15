@@ -10,6 +10,7 @@ import utils
 from monster import parseMonster
 from item import parseItem
 from spell import parseSpell
+from cclass import parseClass
 
 # Argument Parser
 parser = argparse.ArgumentParser(
@@ -35,6 +36,23 @@ parser.add_argument(
     action='store',
     default=False,
     help="combines inputs into given output (default: false)")
+parser.add_argument(
+    '--no-html',
+    dest="nohtml",
+    action='store_const',
+    const=True,
+    default=False,
+    help="no html tags (default: false)")
+
+parser.add_argument(
+    '--images',
+    dest="addimgs",
+    action='store_const',
+    const=True,
+    default=False,
+    help="copy images to compendium directories (default: false)")
+
+
 args = parser.parse_args()
 
 if args.combinedoutput:
@@ -47,10 +65,21 @@ if args.combinedoutput:
     iloss = 0
     swins = 0
     sloss = 0
+    cwins = 0
+    closs = 0
 for file in args.inputJSON:
     with open(file) as f:
         d = json.load(f)
         f.close()
+
+    fluff = None
+
+    if os.path.isfile(os.path.split(file)[0] + "/fluff-" + os.path.split(file)[1]):
+        if args.verbose:
+            print("Fluff file found:",os.path.split(file)[0] + "/fluff-" + os.path.split(file)[1])
+        with open(os.path.split(file)[0] + "/fluff-" + os.path.split(file)[1]) as f:
+            fluff = json.load(f)
+            f.close()
 
     ignoreError = args.IE
     if not args.combinedoutput:
@@ -64,21 +93,30 @@ for file in args.inputJSON:
         iloss = 0
         swins = 0
         sloss = 0
+        cwins = 0
+        closs = 0
     if 'monster' in d:
         for m in d['monster']:
+            if fluff is not None and 'monster' in fluff:
+                if 'entries' in m:
+                    m['entries'] += utils.appendFluff(fluff,m['name'])
+                else:
+                    m['entries'] = utils.appendFluff(fluff,m['name'])
+                if 'image' not in m:
+                    m['image'] = utils.findFluffImage(fluff,m['name'])
             if ignoreError:
                 try:
                     parseMonster(m, compendium, args)
-                    wins += 1
+                    mwins += 1
                 except Exception:
                     print("FAILED: " + m['name'])
-                    loss += 1
+                    mloss += 1
                     continue
             else:
                 if args.verbose:
                     print("Parsing " + m['name'])
                 parseMonster(m, compendium, args)
-                wins += 1
+                mwins += 1
     if 'spell' in d:
         for m in d['spell']:
             if ignoreError:
@@ -94,6 +132,21 @@ for file in args.inputJSON:
                     print("Parsing " + m['name'])
                 parseSpell(m, compendium, args)
                 swins += 1
+    if 'class' in d:
+        for m in d['class']:
+            if ignoreError:
+                try:
+                    parseClass(m, compendium, args)
+                    cwins += 1
+                except Exception:
+                    print("FAILED: " + m['name'])
+                    closs += 1
+                    continue
+            else:
+                if args.verbose:
+                    print("Parsing " + m['name'])
+                parseClass(m, compendium, args)
+                cwins += 1
     if 'item' in d:
         for m in d['item']:
             if ignoreError:
@@ -113,7 +166,7 @@ for file in args.inputJSON:
         for m in d['baseitem']:
             if ignoreError:
                 try:
-                    parseItem(m, compendium, args)
+                    parseItem(copy.deepcopy(m), compendium, args)
                     iwins += 1
                 except Exception:
                     print("FAILED: " + m['name'])
@@ -122,7 +175,7 @@ for file in args.inputJSON:
             else:
                 if args.verbose:
                     print("Parsing " + m['name'])
-                parseItem(m, compendium, args)
+                parseItem(copy.deepcopy(m), compendium, args)
                 iwins += 1
         with open("./data/magicvariants.json") as f:
             mv = json.load(f)
@@ -194,6 +247,10 @@ for file in args.inputJSON:
         if swins > 0 or sloss > 0:
             print("Converted {}/{} spells (failed {})".format(swins, swins +
                                                             sloss, sloss) if ignoreError else "Converted {} spells".format(swins))
+        if cwins > 0 or closs > 0:
+            print("Converted {}/{} classes (failed {})".format(cwins, cwins +
+                                                            closs, closs) if ignoreError else "Converted {} classes".format(cwins))
+
         if iwins > 0 or iloss > 0:
             print("Converted {}/{} items (failed {})".format(iwins, iwins +
                                                             iloss, iloss) if ignoreError else "Converted {} items".format(iwins))
@@ -204,6 +261,7 @@ for file in args.inputJSON:
             os.path.splitext(file)[0] +
             ".xml",
             xml_declaration=True,
+            short_empty_elements=False,
             encoding='utf-8')
 if args.combinedoutput:
     if mwins > 0 or mloss > 0:
@@ -212,9 +270,12 @@ if args.combinedoutput:
     if swins > 0 or sloss > 0:
         print("Converted {}/{} spells (failed {})".format(swins, swins + sloss,
                                                         sloss) if ignoreError else "Converted {} spells".format(swins))
+    if cwins > 0 or closs > 0:
+        print("Converted {}/{} classes (failed {})".format(cwins, cwins + closs,
+                                                        closs) if ignoreError else "Converted {} classes".format(cwins))
     if iwins > 0 or iloss > 0:
         print("Converted {}/{} items (failed {})".format(iwins, iwins + iloss,
                                                         iloss) if ignoreError else "Converted {} items".format(iwins))
     # write to file
     tree = ET.ElementTree(utils.indent(compendium, 1))
-    tree.write(args.combinedoutput, xml_declaration=True, encoding='utf-8')
+    tree.write(args.combinedoutput, xml_declaration=True, short_empty_elements=False, encoding='utf-8')
