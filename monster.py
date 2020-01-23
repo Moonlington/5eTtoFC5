@@ -9,14 +9,12 @@ from slugify import slugify
 from shutil import copyfile
 
 def parseMonster(m, compendium, args):
-    if m['name'] == "Demogorgon" and m['source'] == "HftT":
-        m['name'] = "Demogorgon (monstrosity)"
     if '_copy' in m:
         if args.verbose:
             print("COPY: " + m['name'] + " from " + m['_copy']['name'] + " in " + m['_copy']['source'])
         xtrsrc = "./data/bestiary/bestiary-" + m['_copy']['source'].lower() + ".json"
         try:
-            with open(xtrsrc) as f:
+            with open(xtrsrc,encoding='utf-8') as f:
                 d = json.load(f)
                 f.close()
             mcpy = copy.deepcopy(m)
@@ -26,7 +24,7 @@ def parseMonster(m, compendium, args):
                         if args.verbose:
                             print("ANOTHER COPY: " + mn['name'] + " from " + mn['_copy']['name'] + " in " + mn['_copy']['source'])
                         xtrsrc2 = "./data/bestiary/bestiary-" + mn['_copy']['source'].lower() + ".json"
-                        with open(xtrsrc2) as f:
+                        with open(xtrsrc2,encoding='utf-8') as f:
                             d2 = json.load(f)
                             f.close()
                         for mn2 in d2['monster']:
@@ -42,6 +40,12 @@ def parseMonster(m, compendium, args):
                         m["otherSources"] = mcpy["otherSources"]
                     elif "otherSources" in m:
                         del m["otherSources"]
+                    if 'size' in mcpy:
+                        m['size'] = mcpy['size']
+                    if 'hp' in mcpy:
+                        m['hp'] = mcpy['hp']
+                    if 'original_name' in mcpy:
+                        m['original_name'] = mcpy['original_name']
                     m['page'] = mcpy['page']
                     if '_mod' in mcpy['_copy']:
                         m = utils.modifyMonster(m,mcpy['_copy']['_mod'])
@@ -50,7 +54,7 @@ def parseMonster(m, compendium, args):
                 if args.verbose:
                     print("Adding extra traits for: " + mcpy['_copy']['_trait']['name'])
                 traits = "./data/bestiary/traits.json"
-                with open(traits) as f:
+                with open(traits,encoding='utf-8') as f:
                     d = json.load(f)
                     f.close()
                 for trait in d['trait']:
@@ -71,10 +75,10 @@ def parseMonster(m, compendium, args):
 #    for eachmonsters in compendium.findall('monster'):
 #        if eachmonsters.find('name').text == m['name']:
 #            m['name'] = "{} (DUPLICATE IN {})".format(m['name'],m['source'])
-
     monster = ET.SubElement(compendium, 'monster')
     name = ET.SubElement(monster, 'name')
     name.text = m['name']
+
     size = ET.SubElement(monster, 'size')
     size.text = m['size']
 
@@ -122,7 +126,9 @@ def parseMonster(m, compendium, args):
         hp.text = "{} ({})".format(m['hp']['average'], m['hp']['formula'])
 
     speed = ET.SubElement(monster, 'speed')
-    if 'choose' in m['speed']:
+    if type(m['speed']) == str:
+        speed.text = m['speed']
+    elif 'choose' in m['speed']:
         lis = []
         for key, value in m['speed'].items():
             if key == "walk":
@@ -180,8 +186,9 @@ def parseMonster(m, compendium, args):
                             skills.append("plus one of the following: "+", ".join(["{} {}".format(str.capitalize(ook), oov) for ook, oov in sk["oneOf"].items()]))
         skill.text = ", ".join(skills)
 
-    passive = ET.SubElement(monster, 'passive')
-    passive.text = str(m['passive'])
+    if 'passive' in m:
+        passive = ET.SubElement(monster, 'passive')
+        passive.text = str(m['passive'])
 
     languages = ET.SubElement(monster, 'languages')
     if 'languages' in m:
@@ -227,14 +234,15 @@ def parseMonster(m, compendium, args):
                 artworkpath = m['image']
             else:
                 artworkpath = None
+            monstername = m["original_name"] if "original_name" in m else m["name"]
             if artworkpath and os.path.isfile("./img/" + artworkpath):
                 artworkpath = "./img/" + artworkpath
-            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + m["name"] + ".jpg"):
-                artworkpath = "./img/bestiary/" + m["source"] + "/" + m["name"] + ".jpg"
-            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + m["name"] + ".png"):
-                artworkpath = "./img/bestiary/" + m["source"] + "/" + m["name"] + ".png"
-            elif os.path.isfile("./img/" + m["source"] + "/" + m["name"] + ".png"):
-                artworkpath = "./img/" + m["source"] + "/" + m["name"] + ".png"
+            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + monstername + ".jpg"):
+                artworkpath = "./img/bestiary/" + m["source"] + "/" + monstername + ".jpg"
+            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + monstername + ".png"):
+                artworkpath = "./img/bestiary/" + m["source"] + "/" + monstername + ".png"
+            elif os.path.isfile("./img/" + m["source"] + "/" + monstername + ".png"):
+                artworkpath = "./img/" + m["source"] + "/" + monstername + ".png"
             if artworkpath is not None:
                 copyfile(artworkpath, "./monsters/" + slug + os.path.splitext(artworkpath)[1])
                 imagetag = ET.SubElement(monster, 'image')
@@ -244,7 +252,7 @@ def parseMonster(m, compendium, args):
 #                    img.save(filename="./monsters/" + slug + ".png")
 #                    imagetag = ET.SubElement(monster, 'image')
 #                    imagetag.text = slug + ".png"
-        elif os.path.isfile("./monsters/" + slug + ".png"):
+        elif args.addimgs and os.path.isfile("./monsters/" + slug + ".png"):
             imagetag = ET.SubElement(monster, 'image')
             imagetag.text = slug + ".png"
 
@@ -263,6 +271,8 @@ def parseMonster(m, compendium, args):
         #name.text = "Source"
         #text = ET.SubElement(trait, 'text')
         #text.text = sourcetext
+        srctag = ET.SubElement(monster, 'source')
+        srctag.text = sourcetext
     else:
         sourcetext = None
 
@@ -318,8 +328,29 @@ def parseMonster(m, compendium, args):
     if 'action' in m and m['action'] is not None:
         for t in m['action']:
             action = ET.SubElement(monster, 'action')
-            name = ET.SubElement(action, 'name')
-            name.text = utils.remove5eShit(t['name'])
+            if 'name' in t:
+                name = ET.SubElement(action, 'name')
+                name.text = utils.remove5eShit(t['name'])
+            if 'entries' not in t:
+                text = ET.SubElement(action, 'text')
+                if type(t) == dict and t["type"] == "list" and "style" in t and t["style"] == "list-hang-notitle":
+                    text.text = ""
+                    for item in t["items"]:
+                        if args.nohtml:
+                            text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                        else:
+                            text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                elif type(t) == dict and t["type"] == "list":
+                    text.text = ""
+                    for item in t["items"]:
+                        text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
+                else:
+                    text.text = utils.fixTags(t,m,args.nohtml)
+                    for match in re.finditer(r'{@hit \+?(.*?)}.*?{@damage (.*?)}',t):
+                        if match.group(1) and match.group(2):
+                            attack = ET.SubElement(action, 'attack')
+                            attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False),utils.fixTags(match.group(2),m,False))
+                continue
             for e in t['entries']:
                 if isinstance(e, dict):
                     if "colLabels" in e:
@@ -621,7 +652,7 @@ def parseMonster(m, compendium, args):
                         text.text = utils.fixTags(e,m,args.nohtml)
 
     if 'legendaryGroup' in m:
-        with open("./data/bestiary/meta.json") as f:
+        with open("./data/bestiary/meta.json",encoding='utf-8') as f:
             meta = json.load(f)
             f.close()
         for l in meta['legendaryGroup']:

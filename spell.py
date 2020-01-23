@@ -109,10 +109,10 @@ def parseSpell(m, compendium, args):
     classlist = []
     if "classes" in m and "fromClassList" in m["classes"]:
         for c in m["classes"]["fromClassList"]:
-        	classlist.append(c["name"])
+        	classlist.append(c["name"] + " (UA)" if c["source"].startswith("UA") else c["name"])
     if "classes" in m and "fromSubclass" in m["classes"]:
         for c in m["classes"]["fromSubclass"]:
-        	classlist.append("{} ({})".format(c["class"]["name"],c["subclass"]["name"]))
+        	classlist.append("{} ({})".format(c["class"]["name"] + " (UA)" if c["class"]["source"].startswith("UA") else c["class"]["name"],c["subclass"]["name"]))
     classes.text = ", ".join(classlist)
 
     if "entriesHigherLevel" in m:
@@ -199,3 +199,60 @@ def parseSpell(m, compendium, args):
                             bodyText.text += "• {}".format(utils.fixTags(item,m,args.nohtml)) + "\n"
                 else:
                     bodyText.text += utils.fixTags(e,m,args.nohtml) + "\n"
+
+        bodyText.text = bodyText.text.rstrip()
+
+        for match in re.finditer(r'(([0-9])+[dD]([0-9])+([ ]?[-+][ ]?[0-9]+)?)( +\+ +your spellcasting ability modifier| for each slot level above ([0-9]))?',bodyText.text):
+            if match.group(5) and match.group(6):
+                if "entriesHigherLevel" in m:
+                    higherslot = ""
+                    for higher in m["entriesHigherLevel"]:
+                       higherslot += " ".join(higher["entries"])
+                    for scale in re.finditer(r'{@scaled(amage|ice) ([0-9]+)[dD]([0-9]+)(;([0-9]+)[dD]([0-9]+))?( +[-+] +[0-9]+)?\|(([0-9])-([0-9])|([0-9],?)*)\|([0-9]+)[dD]([0-9]+)}',higherslot):
+                        basecount = int(scale.group(2))
+                        baseface = int(scale.group(3))
+                        addcount = int(scale.group(12))
+                        addface = int(scale.group(13))
+                        base2count = None
+                        base2face = None
+                        if scale.group(4):
+                            base2count = int(scale.group(5))
+                            base2face = int(scale.group(6))
+                        if scale.group(9) and scale.group(10):
+                            scales = int(scale.group(10))-int(scale.group(9))
+                        else:
+                            scales = len(scale.group(8).split(','))
+                        for i in range(scales):        
+                            rolltext = "{}d{}{}".format(
+                                basecount+((i+1)*addcount) if addface == baseface else basecount,
+                                baseface,scale.group(7) if scale.group(7) else "")
+                            if not spell.find("./[roll='{}']".format(rolltext)):
+                                roll = ET.SubElement(spell, 'roll')
+                                roll.text = rolltext
+                            if base2count and base2face:
+                                rolltext = "{}d{}".format(
+                                    base2count+((i+1)*addcount) if addface == base2face else base2count,
+                                    base2face
+                                    )
+                                if not spell.find("./[roll='{}']".format(rolltext)):
+                                    roll = ET.SubElement(spell, 'roll')
+                                    roll.text = rolltext
+                else:
+                    mult = 1
+                    for i in range(int(match.group(11)),9):
+                        rolltext = "{}d{}".format(int(match.group(2))*mult,match.group(3))
+                        if not spell.find("./[roll='{}']".format(rolltext)):
+                            roll = ET.SubElement(spell, 'roll')
+                            roll.text = rolltext
+                        mult += 1
+            elif match.group(5):
+                if not spell.find("./[roll='{}+SPELL']".format(match.group(1))):
+                    roll = ET.SubElement(spell, 'roll')
+                    roll.text = "{}+SPELL".format(match.group(1))
+            elif match.group(1):
+                if not spell.find("./[roll='{}']".format(match.group(1))):
+                    roll = ET.SubElement(spell, 'roll')
+                    roll.text = "{}".format(match.group(1))
+
+
+

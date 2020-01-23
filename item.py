@@ -6,12 +6,7 @@ import os
 from slugify import slugify
 from wand.image import Image
 
-excludedages = ['futuristic','modern','renaissance']
 def parseItem(m, compendium, args):
-    if 'age' in m and m['age'].lower() in excludedages:
-        if args.verbose:
-            print ("SKIPPING",m['age'],"ITEM:",m['name'])
-        return
     if '_copy' in m:
         if args.verbose:
             print("COPY: " + m['name'] + " from " + m['_copy']['name'] + " in " + m['_copy']['source'])
@@ -193,7 +188,54 @@ def parseItem(m, compendium, args):
         if 'type' not in m:
             typ.text = 'G'
 
+
+    if 'entries' not in m:
+        m['entries'] = []
+
+    if 'resist' in m:
+        if m['type'] == "LA" or m['type'] == "MA" or m['type'] == "HA":
+            m['entries'].append("You have resistance to {} damage while you wear this armor.".format(m['resist']))
+        elif m['type'] == "RG":
+            m['entries'].append("You have resistance to {} damage while wearing this ring.".format(m['resist']))
+        elif m['type'] == "P":
+            m['entries'].append("When you drink this potion, you gain resistance to {} damage for 1 hour.".format(m['resist']))
+
+    if 'stealth' in m and m['stealth']:
+        m['entries'].append("The wearer has disadvantage on Stealth (Dexterity) checks.")
+
+    if 'strength' in m and m['type'] == "HA":
+        m['entries'].append("If the wearer has a Strength score lower than {}, their speed is reduced by 10 feet.".format(m['strength']))
+
     heading.text = ", ".join(headings)
+
+    if 'items' in m:
+        if 'scfType' in m:
+            if m['scfType'] == "arcane":
+                m['entries'].insert(0,"An arcane focus is a special item–an orb, a crystal, a rod, a specially constructed staff, a wand-like length of wood, or some similar item–designed to channel the power of arcane spells. A sorcerer, warlock, or wizard can use such an item as a spellcasting focus.")
+            elif m['scfType'] == "druid":
+                m['entries'].insert(0,"A druidic focus might be a sprig of mistletoe or holly, a wand or scepter made of yew or another special wood, a staff drawn whole out of a living tree, or a totem object incorporating feathers, fur, bones, and teeth from sacred animals. A druid can use such an object as a spellcasting focus.")
+            elif m['scfType'] == "holy":
+                m['entries'].insert(0,"A holy symbol is a representation of a god or pantheon. It might be an amulet depicting a symbol representing a deity, the same symbol carefully engraved or inlaid as an emblem on a shield, or a tiny box holding a fragment of a sacred relic. A cleric or paladin can use a holy symbol as a spellcasting focus. To use the symbol in this way, the caster must hold it in hand, wear it visibly, or bear it on a shield.")
+        for i in m['items']:
+            if args.nohtml:
+                m['entries'].append(re.sub(r'^(.*?)(\|.*?)?$',r'\1',i))
+            else:
+                m['entries'].append(re.sub(r'^(.*?)(\|.*?)?$',r'<item>\1</item>',i))
+    elif 'scfType' in m:
+        if m['scfType'] == "arcane":
+            m['entries'].insert(0,"An arcane focus is a special item designed to channel the power of arcane spells. A sorcerer, warlock, or wizard can use such an item as a spellcasting focus.")
+        elif m['scfType'] == "druid":
+            m['entries'].insert(0,"A druid can use this object as a spellcasting focus.")
+        elif m['scfType'] == "holy":
+            m['entries'].insert(0,"A holy symbol is a representation of a god or pantheon.")
+            m['entries'].insert(1,"A cleric or paladin can use a holy symbol as a spellcasting focus. To use the symbol in this way, the caster must hold it in hand, wear it visibly, or bear it on a shield.")
+
+    if 'lootTables' in m:
+        if args.nohtml:
+            m['entries'].append("Found On: {}".format(", ".join(m['lootTables'])))
+        else:
+            m['entries'].append("<i>Found On: {}</i> ".format(", ".join(m['lootTables'])))
+
 
     if 'source' in m:
         slug = slugify(m["name"])
@@ -215,7 +257,7 @@ def parseItem(m, compendium, args):
                     img.save(filename="./items/" + slug + ".png")
                     imagetag = ET.SubElement(itm, 'image')
                     imagetag.text = slug + ".png"
-        elif os.path.isfile("./items/" + slug + ".png"):
+        elif args.addimgs and os.path.isfile("./items/" + slug + ".png"):
             imagetag = ET.SubElement(itm, 'image')
             imagetag.text = slug + ".png"
 
@@ -260,17 +302,51 @@ def parseItem(m, compendium, args):
                             rowthing.append(utils.remove5eShit(str(r)))
                     bodyText.text += " | ".join(rowthing) + "\n"
             elif "entries" in e:
-                subentries = []                    
+                subentries = []
+                if 'name' in e:
+                    if args.nohtml:
+                        bodyText.text += "{}: ".format(e['name'])
+                    else:
+                        bodyText.text += "<b>{}:</b> ".format(e['name'])
                 for sube in e["entries"]:
                     if type(sube) == str:
                         subentries.append(utils.fixTags(sube,m,args.nohtml))
                     elif type(sube) == dict and "text" in sube:
                         subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
-                bodyText.text += "\n".join(subentries)
+                    elif type(sube) == dict and sube["type"] == "list" and "style" in sube and sube["style"] == "list-hang-notitle":
+                        for item in sube["items"]:
+                            if type(item) == dict and 'type' in item and item['type'] == 'item':
+                                if args.nohtml:
+                                    subentries.append("• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                                else:
+                                    subentries.append("• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                            else:
+                                subentries.append("• {}".format(utils.fixTags(item,m,args.nohtml)))
+                    elif type(sube) == dict and sube["type"] == "list":
+                        for item in sube["items"]:
+                            if type(item) == dict and "entries" in item:
+                                ssubentries = []                    
+                                for sse in item["entries"]:
+                                    if type(sse) == str:
+                                        ssubentries.append(utils.fixTags(sse,m,args.nohtml))
+                                    elif type(sse) == dict and "text" in sse:
+                                        ssubentries.append(utils.fixTags(sse["text"],m,args.nohtml))
+                                    subentries.append("\n".join(ssubentries))
+                            elif type(item) == dict and 'type' in item and item['type'] == 'item':
+                                if args.nohtml:
+                                    subentries.append("• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                                else:
+                                    subentries.append("• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                            else:
+                                subentries.append("• {}".format(utils.fixTags(item,m,args.nohtml)))
+                bodyText.text += "\n".join(subentries) + "\n"
             else:
                 if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
                     for item in e["items"]:
-                        bodyText.text += "{}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)) + "\n"
+                        if args.nohtml:
+                            bodyText.text += "• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)) + "\n"
+                        else:
+                            bodyText.text += "• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)) + "\n"
                 elif type(e) == dict and e["type"] == "list":
                     for item in e["items"]:
                         if "entries" in item:
@@ -280,8 +356,10 @@ def parseItem(m, compendium, args):
                                     subentries.append(utils.fixTags(sube,m,args.nohtml))
                                 elif type(sube) == dict and "text" in sube:
                                     subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
-                                    bodyText.text += "\n".join(subentries) + "\n"
+                                bodyText.text += "\n".join(subentries) + "\n"
                         else:
-                            bodyText.text += "{}".format(utils.fixTags(item,m,args.nohtml)) + "\n"
+                            bodyText.text += "• {}".format(utils.fixTags(item,m,args.nohtml)) + "\n"
                 else:
                     bodyText.text += utils.fixTags(e,m,args.nohtml) + "\n"
+
+    bodyText.text = bodyText.text.rstrip()

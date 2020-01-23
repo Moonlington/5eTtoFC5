@@ -10,24 +10,51 @@ def ordinal(n): return "%d%s" % (
 
 def parseRIV(m, t):
     lis = []
-    for r in m[t]:
+    for r in m[t]:    
         if isinstance(r, dict):
             if 'special' in r:
                 lis.append(r['special'])
-            elif t in r:
-                lis += parseRIV(r, t)
-            elif 'resist' in r:
-                lis += parseRIV(r, 'resist')
+#            elif t in r:
+#                lis += parseRIV(r, t)
+#            elif 'resist' in r:
+#                lis += parseRIV(r, 'resist')
             else:
-                lis.append(
-                    "{}{}{}".format(
-                        r['preNote'] +
-                        " " if 'preNote' in r else "",
-                        ", ".join(
-                            [
-                                x for x in r[t]]),
-                        " " +
-                        r['note'] if 'note' in r else ""))
+                riv = []
+                for x in r[t]:
+                    if isinstance(x, dict) and t in x:
+                        if len(riv) > 0:
+                            riv[-1] += "; {}{}{}".format(
+                                x['preNote'] +
+                                " " if 'preNote' in x else "",
+                                ", ".join(parseRIV(x, t)),
+                                " " +
+                                x['note'] if 'note' in x else "")
+                        else:
+                            riv.append(
+                            "{}{}{}".format(
+                                x['preNote'] +
+                                " " if 'preNote' in x else "",
+                                ", ".join(parseRIV(x, t)),
+                                " " +
+                                x['note'] if 'note' in x else ""))
+                    else:
+                        riv.append(x)
+                if len(lis) > 0:
+                    lis[-1] += "; {}{}{}".format(
+                            r['preNote'] +
+                            " " if 'preNote' in r else "",
+                            ", ".join(riv),
+                            " " +
+                            r['note'] if 'note' in r else "")
+
+                else:
+                    lis.append(
+                        "{}{}{}".format(
+                            r['preNote'] +
+                            " " if 'preNote' in r else "",
+                            ", ".join(riv),
+                            " " +
+                            r['note'] if 'note' in r else ""))
         else:
             lis.append(r)
     return lis
@@ -50,6 +77,8 @@ def remove5eShit(s):
     s = re.sub(r'{@recharge}', r'(Recharge 6)', s)
     s = re.sub(r'{@dice (.*?)(\|.*?)}', r'\1', s)
     s = re.sub(r'{@scaledice (.*?)\|(.*?)\|(.*?)}', r'\3', s)
+    s = re.sub(r'{@scaledamage (.*?)\|(.*?)\|(.*?)}', r'\3', s)
+    s = re.sub(r'{@table (.*?)\|(.*?)\|(.*?)}', r'\3', s)
     s = re.sub(r'{@filter (.*?)(\|.*?)?}', r'\1', s)
     s = re.sub(r'{@\w+ ([^{]*?)(\|[^{]*?)?}', r'\1', s)
     s = re.sub(r'{@\w+ ((.*?|{.*?})?)(\|(.*?|{.*?})?)?}', r'\1', s)
@@ -148,7 +177,6 @@ def modifyMonster(m,mods):
         elif mod == 'trait' or mod == 'action' or mod == 'reaction' or mod == 'legendary':
             if mod not in m:
                 m[mod] = []
-            m[mod] = modTraits(m[mod],mods[mod])
         elif mod == 'spellcasting' or mod == 'languages' or mod == 'resist' or mod == "variant" or mod == "immune" or mod == "conditionImmune" or mod == "vulnerable":
             if mod not in m:
                 m[mod] = []
@@ -268,6 +296,7 @@ def modifyItem(m,mods):
     return m
 
 def modTraits(trait,mod):
+    print(trait,mod)
     if type(mod) == list:
         for mt in range(len(mod)):
             trait = modTraits(trait,mod[mt])
@@ -434,6 +463,8 @@ def fixTags(s,m,nohtml=False):
                 return matchobj.group(1)
         s = re.sub(r'{=(.*?)([/].*?)?}', propRepl, s)
     if not nohtml:
+        s = re.sub(r'{@([bi]) (.*?)}',r'<\1>\2</\1>', s)
+        s = re.sub(r'{@italic (.*?)}',r'<i>\1</i>', s)
         s = re.sub(r'{@spell (.*?)}', r'<spell>\1</spell>', s)
         s = re.sub(r'{@link (.*?)\|(.*?)?}', r'<a href="\2">\1</a>', s)
         def createMLink(matchobj):
@@ -500,9 +531,9 @@ def multiCR(cr,scale):
             cr = '{:.0f}'.format(cr)
     return cr
 
-def appendFluff(fluff,m):
+def appendFluff(fluff,m,t='monster'):
     entries = []
-    for f in fluff['monster']:
+    for f in fluff[t]:
         if f['name'] == m:
             if 'entries' in f:
                 for e in f['entries']:
@@ -519,8 +550,8 @@ def appendFluff(fluff,m):
                 entries = entries + appendFluff(fluff,f['_appendCopy']['name'])
     return entries
 
-def findFluffImage(fluff,m):
-    for f in fluff['monster']:
+def findFluffImage(fluff,m,t='monster'):
+    for f in fluff[t]:
         if f['name'] == m:
             if 'images' in f:
                 for image in f['images']:
@@ -574,7 +605,7 @@ def getFriendlySource(source):
         if srcfound:
             break
         try:
-            with open(books) as f:
+            with open(books,encoding='utf-8') as f:
                 bks = json.load(f)
                 f.close()
             key = list(bks.keys())[0]
