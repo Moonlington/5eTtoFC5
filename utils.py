@@ -365,7 +365,7 @@ def modList(items,mod):
                 items.append(mod['items'])
         elif mod['mode'] == "replaceOrAppendArr" or mod['mode'] == "replaceArr":
             for i in range(len(items)):
-                if items[i] == mod['replace']:
+                if 'name' in items[i] and items[i]['name'] == mod['replace']:
                     del items[i]
                     if type(mod["items"]) == list:
                         for item in mod["items"]:
@@ -380,6 +380,12 @@ def modList(items,mod):
                 items = [ item for item in items if item not in mod['items'] ]
             else:
                 print("Unhandled mode: " + mod['mode'],mod)
+        elif mod['mode'] == 'insertArr':
+            if type(mod['items']) == list:
+                for item in reversed(mod['items']):
+                    items.insert(mod['index'],item)
+            else:
+                items.insert(mod['index'],mod['items'])
         elif mod['mode'] == 'scalarAddHit':
             for i in range(len(items)):
                 if type(items[i]) == dict and "entries" in items[i]:

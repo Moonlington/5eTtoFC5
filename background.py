@@ -8,9 +8,42 @@ from slugify import slugify
 from wand.image import Image
 
 def parseBackground(m, compendium, args):
+    if '_copy' in m:
+        if args.verbose:
+            print("COPY: " + m['name'] + " from " + m['_copy']['name'] + " in " + m['_copy']['source'])
+        xtrsrc = "./data/backgrounds.json"
+        try:
+            with open(xtrsrc) as f:
+                d = json.load(f)
+                f.close()
+            mcpy = m
+            for mn in d['background']:
+                backgroundfound = False
+                if mn['name'] == mcpy['_copy']['name']:
+                    m = mn
+                    m['name'] = mcpy['name']
+                    m['source'] = mcpy['source']
+                    if "otherSources" in mcpy:
+                        m["otherSources"] = mcpy["otherSources"]
+                    m['page'] = mcpy['page']
+                    if '_mod' in mcpy['_copy']:
+                        m = utils.modifyItem(m,mcpy['_copy']['_mod'])
+                    backgroundfound = True
+                    break
+            if not backgroundfound:
+                print("Could not find ",mcpy['_copy']['name'])
+        except IOError as e:
+            if args.verbose:
+                print ("Could not load additional source ({}): {}".format(e.errno, e.strerror))
+            return
+
     bg = ET.SubElement(compendium, 'background')
     name = ET.SubElement(bg, 'name')
-    name.text = m['name']
+    match = re.match(r'Variant (.*?) \((.*?)\)', m['name'])
+    if match:
+        name.text = "{} / {}".format(match.group(1),match.group(2))
+    else:
+        name.text = m['name']
 
     if 'entries' not in m:
         m['entries'] = []
