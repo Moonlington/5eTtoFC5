@@ -1,3 +1,4 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import xml.etree.cElementTree as ET
 import re
 import utils
@@ -19,6 +20,8 @@ def parseSpell(m, compendium, args):
         school.text = 'EV'
     else:
         school.text = m['school']
+    if m['school'] == 'P' and args.nohtml:
+        spell.remove(school)
 
     if args.addimgs and os.path.isdir("./spells/"):
         image = ET.SubElement(spell, 'image')
@@ -125,27 +128,27 @@ def parseSpell(m, compendium, args):
             m["entries"] += higher["entries"]
 
     if 'source' in m:
-        source = ET.SubElement(spell, 'source')
-        source.text = "{} p. {}".format(
+        #source = ET.SubElement(spell, 'source')
+        sourcetext = "{} p. {}".format(
             utils.getFriendlySource(m['source']), m['page']) if 'page' in m and m['page'] != 0 else utils.getFriendlySource(m['source'])
 
         if 'otherSources' in m and m["otherSources"] is not None:
             for s in m["otherSources"]:
                 if "source" not in s:
                     continue
-                source.text += ", "
-                source.text += "{} p. {}".format(
+                sourcetext += ", "
+                sourcetext += "{} p. {}".format(
                     utils.getFriendlySource(s["source"]), s["page"]) if 'page' in s and s["page"] != 0 else utils.getFriendlySource(s["source"])
         if 'entries' in m:
             if args.nohtml:
-                m['entries'].append("Source: {}".format(source.text))
+                m['entries'].append("Source: {}".format(sourcetext))
             else:
-                m['entries'].append("<i>Source: {}</i>".format(source.text))
+                m['entries'].append("<i>Source: {}</i>".format(sourcetext))
         else:
             if args.nohtml:
-                m['entries'] = "Source: {}".format(source.text)
+                m['entries'] = "Source: {}".format(sourcetext)
             else:
-                m['entries'] = ["<i>Source: {}</i>".format(source.text)]
+                m['entries'] = ["<i>Source: {}</i>".format(sourcetext)]
 
     bodyText = ET.SubElement(spell, 'text')
     bodyText.text = ""
@@ -228,7 +231,7 @@ def parseSpell(m, compendium, args):
                                 baseface,scale.group(7) if scale.group(7) else "")
                             if not spell.find("./[roll='{}']".format(rolltext)):
                                 roll = ET.SubElement(spell, 'roll')
-                                roll.text = rolltext
+                                roll.text = rolltext.replace(' ','')
                             if base2count and base2face:
                                 rolltext = "{}d{}".format(
                                     base2count+((i+1)*addcount) if addface == base2face else base2count,
@@ -236,23 +239,23 @@ def parseSpell(m, compendium, args):
                                     )
                                 if not spell.find("./[roll='{}']".format(rolltext)):
                                     roll = ET.SubElement(spell, 'roll')
-                                    roll.text = rolltext
+                                    roll.text = rolltext.replace(' ','')
                 else:
                     mult = 1
                     for i in range(int(match.group(11)),9):
                         rolltext = "{}d{}".format(int(match.group(2))*mult,match.group(3))
                         if not spell.find("./[roll='{}']".format(rolltext)):
                             roll = ET.SubElement(spell, 'roll')
-                            roll.text = rolltext
+                            roll.text = rolltext.replace(' ','')
                         mult += 1
             elif match.group(5):
                 if not spell.find("./[roll='{}+SPELL']".format(match.group(1))):
                     roll = ET.SubElement(spell, 'roll')
-                    roll.text = "{}+SPELL".format(match.group(1))
+                    roll.text = "{}+SPELL".format(match.group(1)).replace(' ','')
             elif match.group(1):
                 if not spell.find("./[roll='{}']".format(match.group(1))):
                     roll = ET.SubElement(spell, 'roll')
-                    roll.text = "{}".format(match.group(1))
+                    roll.text = "{}".format(match.group(1)).replace(' ','')
 
 
 

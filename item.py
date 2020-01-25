@@ -1,3 +1,4 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import xml.etree.cElementTree as ET
 import re
 import utils
@@ -76,6 +77,9 @@ def parseItem(m, compendium, args):
             typ.text = 'G'
         if m['type'] == "VEH":
             typ.text = 'G'
+        if m['type'] == 'GV':
+            typ.text = 'G'
+            headings.append("Generic Variant")
 
     if 'wondrous' in m and m['wondrous']:
         headings.append("Wondrous item")
@@ -89,14 +93,17 @@ def parseItem(m, compendium, args):
     weight = ET.SubElement(itm, 'weight')
     if 'weight' in m: weight.text = str(m['weight'])
 
-    rarity = ET.SubElement(itm, 'rarity')
-    if 'rarity' in m:
+    if 'rarity' in m and m['rarity'] != 'None' and m['rarity'] != 'Unknown':
+        rarity = ET.SubElement(itm, 'rarity')
         rarity.text = str(m['rarity'])
         if m['rarity'] != 'None' and m['rarity'] != 'Unknown': headings.append(m['rarity'])
 
-    value = ET.SubElement(itm, 'value')
+
     if 'value' in m:
-        if m['value'] >= 100:
+        value = ET.SubElement(itm, 'value')
+        if args.nohtml:
+            value.text = str(m['value']/100)
+        elif m['value'] >= 100:
             value.text = "{:g} gp".format(m['value']/100)
         elif m['value'] >= 10:
             value.text = "{:g} sp".format(m['value']/10)
@@ -168,20 +175,49 @@ def parseItem(m, compendium, args):
             attunement.text = "Requires Attunement " + m['reqAttune']
         headings.append("({})".format(attunement.text))
 
-    dmg1 = ET.SubElement(itm, 'dmg1')
-    if 'dmg1' in m: dmg1.text = utils.remove5eShit(m['dmg1'])
+    if 'dmg1' in m:
+        dmg1 = ET.SubElement(itm, 'dmg1')
+        dmg1.text = utils.remove5eShit(m['dmg1'])
 
-    dmg2 = ET.SubElement(itm, 'dmg2')
-    if 'dmg2' in m: dmg2.text = utils.remove5eShit(m['dmg2'])
 
-    dmgType = ET.SubElement(itm, 'dmgType')
-    if 'dmgType' in m: dmgType.text = m['dmgType']
+    if 'dmg2' in m:
+        dmg2 = ET.SubElement(itm, 'dmg2')
+        dmg2.text = utils.remove5eShit(m['dmg2'])
 
-    rng = ET.SubElement(itm, 'range')
-    if 'range' in m: rng.text = m['range']
+    if 'dmgType' in m:
+        dmgType = ET.SubElement(itm, 'dmgType')
+        if m['dmgType'] == 'O':
+            dmgType.text = 'FC'
+        elif m['dmgType'] == 'I':
+            dmgType.text = 'PS'
+        else:
+            dmgType.text = m['dmgType']
 
-    ac = ET.SubElement(itm, 'ac')
-    if 'ac' in m: ac.text = str(m['ac'])
+    if 'range' in m:
+        rng = ET.SubElement(itm, 'range')
+        rng.text = m['range']
+
+
+    if 'ac' in m:
+        ac = ET.SubElement(itm, 'ac')
+        ac.text = str(m['ac'])
+
+    if 'bonus' in m:
+        if 'type' in m and m['type'] in ['LA','MA','HA','S']:
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "ac {}".format(m['bonus'])
+        elif 'type' in m and m['type'] in ['M','R','A']:
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon attack {}".format(m['bonus'])
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon damage {}".format(m['bonus'])
+        elif 'staff' in m and m['staff']:
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon attack {}".format(m['bonus'])
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon damage {}".format(m['bonus'])
+        else:
+            print(m)
 
     if 'poison' in m and m['poison']:
         headings.append('Poison')
@@ -207,6 +243,14 @@ def parseItem(m, compendium, args):
         m['entries'].append("If the wearer has a Strength score lower than {}, their speed is reduced by 10 feet.".format(m['strength']))
 
     heading.text = ", ".join(headings)
+    
+    if args.nohtml:
+        try:
+            itm.remove(heading)
+            itm.remove(rarity)
+            itm.remove(attunement)
+        except:
+            pass
 
     if 'items' in m:
         if 'scfType' in m:
@@ -261,25 +305,25 @@ def parseItem(m, compendium, args):
             imagetag = ET.SubElement(itm, 'image')
             imagetag.text = slug + ".png"
 
-        source = ET.SubElement(itm, 'source')
-        source.text = "{} p. {}".format(
+        #source = ET.SubElement(itm, 'source')
+        sourcetext = "{} p. {}".format(
             utils.getFriendlySource(m['source']), m['page']) if 'page' in m and m['page'] != 0 else utils.getFriendlySource(m['source'])
 
         if 'otherSources' in m and m["otherSources"] is not None:
             for s in m["otherSources"]:
-                source.text += ", "
-                source.text += "{} p. {}".format(
+                sourcetext += ", "
+                sourcetext += "{} p. {}".format(
                     utils.getFriendlySource(s["source"]), s["page"]) if 'page' in s and s["page"] != 0 else utils.getFriendlySource(s["source"])
         if 'entries' in m:
             if args.nohtml:
-                m['entries'].append("Source: {}".format(source.text))
+                m['entries'].append("Source: {}".format(sourcetext))
             else:
-                m['entries'].append("<i>Source: {}</i>".format(source.text))
+                m['entries'].append("<i>Source: {}</i>".format(sourcetext))
         else:
             if args.nohtml:
-                m['entries'] = ["Source: {}".format(source.text)]
+                m['entries'] = ["Source: {}".format(sourcetext)]
             else:
-                m['entries'] = ["<i>Source: {}</i>".format(source.text)]
+                m['entries'] = ["<i>Source: {}</i>".format(sourcetext)]
     bodyText = ET.SubElement(itm, 'text')
     bodyText.text = ""
 
@@ -363,3 +407,7 @@ def parseItem(m, compendium, args):
                     bodyText.text += utils.fixTags(e,m,args.nohtml) + "\n"
 
     bodyText.text = bodyText.text.rstrip()
+    for match in re.finditer(r'([0-9])+[dD]([0-9])+([ ]?[-+][ ]?[0-9]+)?',bodyText.text):
+        if not itm.find("./[roll='{}']".format(match.group(0))):
+            roll = ET.SubElement(itm, 'roll')
+            roll.text = "{}".format(match.group(0)).replace(' ','')

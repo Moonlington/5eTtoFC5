@@ -13,6 +13,9 @@ from monster import parseMonster
 from item import parseItem
 from spell import parseSpell
 from cclass import parseClass
+from background import parseBackground
+from feat import parseFeat
+from race import parseRace
 
 # Argument Parser
 parser = argparse.ArgumentParser(
@@ -103,7 +106,7 @@ if args.updatedata:
     classdir = os.path.join(datadir,"class")
     bestiarydir = os.path.join(datadir,"bestiary")
     spellsdir = os.path.join(datadir,"spells")
-    items = [ 'items.json','items-base.json','magicvariants.json','vehicles.json','fluff-vehicles.json' ]
+    items = [ 'items.json','items-base.json','magicvariants.json','vehicles.json','fluff-vehicles.json','backgrounds.json','fluff-backgrounds.json','feats.json','races.json','fluff-races.json' ]
 
     try:
         if not os.path.exists(datadir):
@@ -203,6 +206,15 @@ if args.combinedoutput:
     swins = 0
     sloss = 0
     sdupe = 0
+    bwins = 0
+    bloss = 0
+    bdupe = 0
+    fwins = 0
+    floss = 0
+    fdupe = 0
+    rwins = 0
+    rloss = 0
+    rdupe = 0
     cwins = 0
     closs = 0
 for file in args.inputJSON:
@@ -234,6 +246,24 @@ for file in args.inputJSON:
         swins = 0
         sloss = 0
         sdupe = 0
+        bwins = 0
+        bloss = 0
+        bdupe = 0
+        fwins = 0
+        floss = 0
+        fdupe = 0
+        rwins = 0
+        rloss = 0
+        rdupe = 0
+        rwins = 0
+        rloss = 0
+        rdupe = 0
+        rwins = 0
+        rloss = 0
+        rdupe = 0
+        rwins = 0
+        rloss = 0
+        rdupe = 0
         cwins = 0
         closs = 0
     if 'monster' in d:
@@ -297,9 +327,9 @@ for file in args.inputJSON:
                 mdupe += 1
             if fluff is not None and 'vehicle' in fluff:
                 if 'entries' in m:
-                    m['entries'] += utils.appendFluff(fluff,m['name'],'vehicle')
+                    m['entries'] += utils.appendFluff(fluff,m['name'],'vehicle',args.nohtml)
                 else:
-                    m['entries'] = utils.appendFluff(fluff,m['name'],'vehicle')
+                    m['entries'] = utils.appendFluff(fluff,m['name'],'vehicle',args.nohtml)
                 if 'image' not in m:
                     m['image'] = utils.findFluffImage(fluff,m['name'],'vehicle')
             if 'alignment' not in m:
@@ -450,7 +480,6 @@ for file in args.inputJSON:
                     print("Parsing " + m['name'])
                 parseMonster(m, compendium, args)
                 mwins += 1
-
     if 'spell' in d:
         for m in d['spell']:
             for xmlmon in compendium.findall("./spell[name='{}']".format(re.sub(r'\'','*',m['name']))):
@@ -471,6 +500,152 @@ for file in args.inputJSON:
                     print("Parsing " + m['name'])
                 parseSpell(m, compendium, args)
                 swins += 1
+    if 'background' in d:
+        for m in d['background']:
+            for xmlmon in compendium.findall("./background[name='{}']".format(re.sub(r'\'','*',m['name']))):
+                if args.verbose or args.showdupe:
+                    print ("Found duplicate entry for {} from {}".format(m['name'],xmlmon.find('source').text))
+                bdupe += 1
+            if fluff is not None and 'background' in fluff:
+                if 'entries' in m:
+                    m['entries'] = utils.appendFluff(fluff,m['name'],'background',args.nohtml) + m['entries']
+                else:
+                    m['entries'] = utils.appendFluff(fluff,m['name'],'background',args.nohtml)
+                if 'image' not in m:
+                    m['image'] = utils.findFluffImage(fluff,m['name'],'background')
+            if ignoreError:
+                try:
+                    parseBackground(m, compendium, args)
+                    bwins += 1
+                except Exception:
+                    print("FAILED: " + m['name'])
+                    bloss += 1
+                    continue
+            else:
+                if args.verbose:
+                    print("Parsing " + m['name'])
+                parseBackground(m, compendium, args)
+                bwins += 1
+
+    if 'feat' in d:
+        for m in d['feat']:
+            if m['source'].startswith('UA'):
+                m['original_name'] = m['name']
+                m['name'] = m['name'] + " (UA)"
+            for xmlmon in compendium.findall("./feat[name='{}']".format(re.sub(r'\'','*',m['name']))):
+                if args.verbose or args.showdupe:
+                    print ("Found duplicate entry for {}".format(m['name']))
+                fdupe += 1
+
+            if ignoreError:
+                try:
+                    parseFeat(m, compendium, args)
+                    fwins += 1
+                except Exception:
+                    print("FAILED: " + m['name'])
+                    floss += 1
+                    continue
+            else:
+                if args.verbose:
+                    print("Parsing " + m['name'])
+                parseFeat(m, compendium, args)
+                fwins += 1
+
+    if 'race' in d:
+        for race in d['race']:
+            m = copy.deepcopy(race)
+            if m['source'].startswith('UA'):
+                m['original_name'] = m['name']
+                if m['source'] == "UARacesOfEberron":
+                    m['name'] = m['name'] + " (UA Races of Eberron)"
+                else:
+                    m['name'] = m['name'] + " (UA)"
+            elif m['source'] == "DMG":
+                m['original_name'] = m['name']
+                m['name'] = m['name'] + " (DMG)"
+            elif m['source'] == "PSK" and m['name'] == "Vedalken":
+                m['original_name'] = m['name']
+                m['name'] = m['name'] + " (Kaladesh)"
+            if fluff is not None and 'race' in fluff:
+                if 'entries' in m:
+                    m['entries'] += utils.appendFluff(fluff,m['name'],'race',args.nohtml)
+                else:
+                    m['entries'] = utils.appendFluff(fluff,m['name'],'race',args.nohtml)
+                if 'image' not in m:
+                    m['image'] = utils.findFluffImage(fluff,m['name'],'race')
+            if 'subraces' in m:
+                for sub in m['subraces']:
+                    sr = copy.deepcopy(m)
+                    if "source" in sub and "source" in sr:
+                        del sr["source"]
+                    if "page" in sub and "page" in sr:
+                        del sr["page"]
+                    if "name" not in sub:
+                        if "source" in sub and "source" not in sr:
+                            if sub["source"] == "GGR":
+                                sr["name"] += " (Ravnica)"
+                            elif sub["source"] == "ERLW":
+                                sr["name"] += " (Eberron)"
+                            elif sub["source"].startswith("UA"):
+                                sr["name"] += " (UA)"
+                    for k,v in sub.items():
+                        if k == "name":
+                            if "source" in sub and sub["source"].startswith("UA"):
+                                sr['name'] += " ({}–UA)".format(v)
+                            elif "source" in sub and sub["source"] == "DMG":
+                                sr['name'] += " ({}–DMG)".format(v)
+                            else:
+                                sr['name'] += " ({})".format(v)
+                        elif k == "ability" in sub and "ability" in sr:
+                            sr["ability"] += v
+                        elif k == "entries":
+                            insertpoint = 0
+                            for e in v:
+                                if "data" in e:
+                                    for en in sr["entries"]:
+                                        if type(en) == dict and "name" in en and en["name"] == e["data"]["overwrite"]:
+                                            en["name"] = e["name"]
+                                            en["entries"] = e["entries"]
+                                else:
+                                    sr["entries"].insert(insertpoint,e)
+                                    insertpoint += 1
+                        else:
+                            sr[k] = v
+                    for xmlmon in compendium.findall("./race[name='{}']".format(re.sub(r'\'','*',sr['name']))):
+                        if args.verbose or args.showdupe:
+                            print ("Found duplicate entry for {}".format(sr['name']))
+                        rdupe += 1
+                    if ignoreError:
+                        try:
+                            parseRace(sr, compendium, args)
+                            rwins += 1
+                        except Exception:
+                            print("FAILED: " + sr['name'])
+                            rloss += 1
+                            continue
+                    else:
+                        if args.verbose:
+                            print("Parsing " + sr['name'])
+                        parseRace(sr, compendium, args)
+                        rwins += 1
+            else:
+                for xmlmon in compendium.findall("./race[name='{}']".format(re.sub(r'\'','*',m['name']))):
+                    if args.verbose or args.showdupe:
+                        print ("Found duplicate entry for {}".format(m['name']))
+                    rdupe += 1
+                if ignoreError:
+                    try:
+                        parseRace(m, compendium, args)
+                        rwins += 1
+                    except Exception:
+                        print("FAILED: " + m['name'])
+                        rloss += 1
+                        continue
+                else:
+                    if args.verbose:
+                        print("Parsing " + m['name'])
+                    parseRace(m, compendium, args)
+                    rwins += 1
     if 'class' in d:
         for m in d['class']:
             if ignoreError:
@@ -666,6 +841,19 @@ for file in args.inputJSON:
             print("Converted {}/{} items (failed {})".format(iwins, iwins +
                                                             iloss, iloss) if ignoreError else "Converted {} items".format(iwins))
             if idupe > 0: print(" ({} duplicate{})".format(idupe,"s" if idupe > 1 else ""))
+        if bwins > 0 or bloss > 0:
+            print("Converted {}/{} backgrounds (failed {})".format(bwins, bwins +
+                                                            bloss, bloss) if ignoreError else "Converted {} backgrounds".format(bwins))
+            if bdupe > 0: print(" ({} duplicate{})".format(bdupe,"s" if bdupe > 1 else ""))
+        if fwins > 0 or floss > 0:
+            print("Converted {}/{} feats (failed {})".format(fwins, fwins +
+                                                            floss, floss) if ignoreError else "Converted {} feats".format(fwins))
+            if fdupe > 0: print(" ({} duplicate{})".format(fdupe,"s" if fdupe > 1 else ""))
+        if rwins > 0 or rloss > 0:
+            print("Converted {}/{} races (failed {})".format(rwins, rwins +
+                                                            rloss, rloss) if ignoreError else "Converted {} races".format(rwins))
+            if rdupe > 0: print(" ({} duplicate{})".format(rdupe,"s" if rdupe > 1 else ""))
+
         # write to file
         tree = ET.ElementTree(utils.indent(compendium, 1))
         tree.write(
@@ -690,6 +878,20 @@ if args.combinedoutput:
         print("Converted {}/{} items (failed {})".format(iwins, iwins + iloss,
                                                         iloss) if ignoreError else "Converted {} items".format(iwins))
         if idupe > 0: print(" ({} duplicate{})".format(idupe,"s" if idupe > 1 else ""))
+    if bwins > 0 or bloss > 0:
+        print("Converted {}/{} backgrounds (failed {})".format(bwins, bwins +
+                                                        bloss, bloss) if ignoreError else "Converted {} backgrounds".format(bwins))
+        if bdupe > 0: print(" ({} duplicate{})".format(bdupe,"s" if bdupe > 1 else ""))
+    if fwins > 0 or floss > 0:
+        print("Converted {}/{} feats (failed {})".format(fwins, fwins +
+                                                        floss, floss) if ignoreError else "Converted {} feats".format(fwins))
+        if fdupe > 0: print(" ({} duplicate{})".format(fdupe,"s" if fdupe > 1 else ""))
+    if rwins > 0 or rloss > 0:
+        print("Converted {}/{} races (failed {})".format(rwins, rwins +
+                                                        rloss, rloss) if ignoreError else "Converted {} races".format(rwins))
+        if rdupe > 0: print(" ({} duplicate{})".format(rdupe,"s" if rdupe > 1 else ""))
+
+
     # write to file
     tree = ET.ElementTree(utils.indent(compendium, 1))
     tree.write(args.combinedoutput, xml_declaration=True, short_empty_elements=False, encoding='utf-8')

@@ -1,3 +1,4 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import re
 import math
 import copy
@@ -531,7 +532,7 @@ def multiCR(cr,scale):
             cr = '{:.0f}'.format(cr)
     return cr
 
-def appendFluff(fluff,m,t='monster'):
+def appendFluff(fluff,m,t='monster',nohtml=False):
     entries = []
     for f in fluff[t]:
         if f['name'] == m:
@@ -540,7 +541,10 @@ def appendFluff(fluff,m,t='monster'):
                     if type(e) == dict and 'entries' in e and any('entries' in se for se in e['entries']):
                         for se in e['entries']:
                             if type(se) == dict and 'entries' in se:
-                                if 'name' in se: entries.append("<b>{}</b>".format(se['name']))
+                                if 'name' in se and nohtml:
+                                        entries.append("{}".format(se['name']))
+                                else:
+                                        entries.append("<b>{}</b>".format(se['name']))
                                 entries += (se['entries'])
                     else:
                         entries.append(e)
@@ -596,9 +600,16 @@ def getFriendlySource(source):
         friendly = "Wayfinder's Guide to Eberron"
     elif source == "SADS":
         friendly = "Sapphire Anniversary Dice Set"
+    elif source == "AWM":
+        friendly = "Adventure with Muk"
+    elif source == "OGA":
+        friendly = "One Grung Above"
     elif source.startswith("UA"):
         friendly = re.sub(r"(\w)([A-Z])", r"\1 \2", friendly)
         friendly = re.sub(r"U A", r"Unearthed Arcana: ", friendly)
+    elif source.startswith("AL"):
+        friendly = re.sub(r"(\w)([A-Z])", r"\1 \2", friendly)
+        friendly = re.sub(r"A L", r"Adventurers League: ", friendly)
     else:
         srcfound = False
     for books in allbooks:

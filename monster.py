@@ -1,3 +1,4 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import xml.etree.cElementTree as ET
 import re
 import utils
@@ -109,21 +110,48 @@ def parseMonster(m, compendium, args):
     acstr = []
     for acs in m['ac']:
         if isinstance(acs, dict):
-            if 'from' in acs:
-                acstr.append("{} ({})".format(
-                    acs['ac'], utils.remove5eShit(acs['from'][0])))
-            elif 'condition' in acs:
-                acstr.append("{} ({})".format(
-                    acs['ac'], utils.remove5eShit(acs['condition'])))
+            if len(acstr) == 0:
+                acstr.append(str(acs['ac']))
+                if 'from' in acs and 'condition' in acs:
+                    acstr.append(utils.fixTags(", ".join(acs['from']) + " " + acs['condition'],m,args.nohtml))
+                elif 'from' in acs:
+                    acstr.append(utils.fixTags(", ".join(acs['from']),m,args.nohtml))
+                elif 'condition' in acs:
+                    acstr.append(utils.fixTags(acs['condition'],m,args.nohtml))
+                continue
+            acstr.append(utils.fixTags("{}".format(
+                "{} {}".format(
+                    acs['ac'],
+                    "("+", ".join(acs['from']) + ") " + acs['condition'] if 'from' in acs and 'condition' in acs else
+                    "("+", ".join(acs['from'])+")" if 'from' in acs else
+                    acs['condition']
+                    ) if 'from' in acs or 'condition' in acs else acs['ac']),m,args.nohtml))
         else:
             acstr.append(str(acs))
-    ac.text = ", ".join(acstr)
+    ac.text = "{} ({})".format(acstr[0],", ".join(acstr[1:])) if len(acstr) > 1 else acstr[0]
 
     hp = ET.SubElement(monster, 'hp')
     if "special" in m['hp']:
-        hp.text = m['hp']['special']
+        if args.nohtml and re.match(r'equal the .*?\'s Constitution modifier',m['hp']['special']):
+            hp.text = str(utils.getAbilityMod(m['con']))
+            if 'trait' in m:
+                m['trait'].insert(0,{"name": "Hit Points","entries": [ m['hp']['special'] ]})
+            else:
+                m['trait'] = [ {"name": "Hit Points","entries": [ m['hp']['special'] ]} ]
+        elif args.nohtml:
+            hpmatch = re.match(r'[0-9]+ ?(\([0-9]+[Dd][0-9]+( ?\+ ?[0-9]+)?\))?', m['hp']['special'])
+            if hpmatch:
+                hp.text = str(hpmatch.group(0)).rstrip()
+            else:
+                hp.text = "0"
+            if 'trait' in m:
+                m['trait'].insert(0,{"name": "Hit Points","entries": [ m['hp']['special'] ]})
+            else:
+                m['trait'] = [ {"name": "Hit Points","entries": [ m['hp']['special'] ]} ]
+        else:
+            hp.text = m['hp']['special']
     else:
-        hp.text = "{} ({})".format(m['hp']['average'], m['hp']['formula'])
+        hp.text = "{} ({})".format(m['hp']['average'], m['hp']['formula'].replace(' ',''))
 
     speed = ET.SubElement(monster, 'speed')
     if type(m['speed']) == str:
@@ -183,7 +211,11 @@ def parseMonster(m, compendium, args):
                 if key == "other":
                     for sk in value:
                         if "oneOf" in sk:
-                            skills.append("plus one of the following: "+", ".join(["{} {}".format(str.capitalize(ook), oov) for ook, oov in sk["oneOf"].items()]))
+                            if args.nohtml:
+                                if 'trait' not in m: m['trait'] = []
+                                m['trait'].insert(0,{"name": "Skills","entries": [ "plus one of the following: "+", ".join(["{} {}".format(str.capitalize(ook), oov) for ook, oov in sk["oneOf"].items()]) ] })
+                            else:
+                                skills.append("plus one of the following: "+", ".join(["{} {}".format(str.capitalize(ook), oov) for ook, oov in sk["oneOf"].items()]))
         skill.text = ", ".join(skills)
 
     if 'passive' in m:
@@ -199,7 +231,8 @@ def parseMonster(m, compendium, args):
         if isinstance(m['cr'], dict):
             cr.text = str(m['cr']['cr'])
         else:
-            cr.text = str(m['cr'])
+            if not m['cr'] == "Unknown":
+                cr.text = str(m['cr'])
 
     resist = ET.SubElement(monster, 'resist')
     if 'resist' in m:
@@ -271,8 +304,8 @@ def parseMonster(m, compendium, args):
         #name.text = "Source"
         #text = ET.SubElement(trait, 'text')
         #text.text = sourcetext
-        srctag = ET.SubElement(monster, 'source')
-        srctag.text = sourcetext
+        #srctag = ET.SubElement(monster, 'source')
+        #srctag.text = sourcetext
     else:
         sourcetext = None
 
@@ -349,7 +382,7 @@ def parseMonster(m, compendium, args):
                     for match in re.finditer(r'{@hit \+?(.*?)}.*?{@damage (.*?)}',t):
                         if match.group(1) and match.group(2):
                             attack = ET.SubElement(action, 'attack')
-                            attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False),utils.fixTags(match.group(2),m,False))
+                            attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False).replace(' ',''),utils.fixTags(match.group(2),m,False).replace(' ',''))
                 continue
             for e in t['entries']:
                 if isinstance(e, dict):
@@ -420,7 +453,7 @@ def parseMonster(m, compendium, args):
                         for match in re.finditer(r'{@hit \+?(.*?)}.*?{@damage (.*?)}',e):
                             if match.group(1) and match.group(2):
                                 attack = ET.SubElement(action, 'attack')
-                                attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False),utils.fixTags(match.group(2),m,False))
+                                attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False).replace(' ',''),utils.fixTags(match.group(2),m,False).replace(' ',''))
 
 
 
