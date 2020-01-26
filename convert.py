@@ -588,12 +588,12 @@ for file in args.inputJSON:
 
     if 'race' in d:
         for race in d['race']:
+            m = copy.deepcopy(race)
             if args.skipua:
                 if m['source'].startswith('UA'):
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
                     continue
-            m = copy.deepcopy(race)
             if m['source'].startswith('UA'):
                 m['original_name'] = m['name']
                 if m['source'] == "UARacesOfEberron":
@@ -618,8 +618,8 @@ for file in args.inputJSON:
                     if args.skipua:
                         if 'source' in sub and sub['source'].startswith('UA'):
                             if args.verbose:
-                                print("Skipping UA Content: ",sub['name'])
-                    continue
+                                print("Skipping UA Content: Subrace ",sub['name'] if 'name' in sub else m['name'])
+                            continue
                     sr = copy.deepcopy(m)
                     if "source" in sub and "source" in sr:
                         del sr["source"]
