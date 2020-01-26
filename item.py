@@ -93,7 +93,7 @@ def parseItem(m, compendium, args):
     weight = ET.SubElement(itm, 'weight')
     if 'weight' in m: weight.text = str(m['weight'])
 
-    if 'rarity' in m and m['rarity'] != 'None' and m['rarity'] != 'Unknown':
+    if 'rarity' in m and m['rarity'] != 'None' and m['rarity'] != 'Unknown' and not args.nohtml:
         rarity = ET.SubElement(itm, 'rarity')
         rarity.text = str(m['rarity'])
         if m['rarity'] != 'None' and m['rarity'] != 'Unknown': headings.append(m['rarity'])
@@ -167,13 +167,14 @@ def parseItem(m, compendium, args):
             headings.append('Tack and Harness')
         elif m['type'] == 'OTH':
             headings.append('Other')
-    attunement = ET.SubElement(itm, 'attunement')
-    if 'reqAttune' in m:
-        if m['reqAttune'] == True:
-            attunement.text = "Requires Attunement"
-        else:
-            attunement.text = "Requires Attunement " + m['reqAttune']
-        headings.append("({})".format(attunement.text))
+    if not args.nohtml:
+        attunement = ET.SubElement(itm, 'attunement')
+        if 'reqAttune' in m:
+            if m['reqAttune'] == True:
+                attunement.text = "Requires Attunement"
+            else:
+                attunement.text = "Requires Attunement " + m['reqAttune']
+            headings.append("({})".format(attunement.text))
 
     if 'dmg1' in m:
         dmg1 = ET.SubElement(itm, 'dmg1')
@@ -247,8 +248,6 @@ def parseItem(m, compendium, args):
     if args.nohtml:
         try:
             itm.remove(heading)
-            itm.remove(rarity)
-            itm.remove(attunement)
         except:
             pass
 

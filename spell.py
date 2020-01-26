@@ -112,10 +112,14 @@ def parseSpell(m, compendium, args):
     classlist = []
     if "classes" in m and "fromClassList" in m["classes"]:
         for c in m["classes"]["fromClassList"]:
-        	classlist.append(c["name"] + " (UA)" if c["source"].startswith("UA") else c["name"])
+                if args.skipua and c['source'].startswith('UA'):
+                    continue
+                classlist.append(c["name"] + " (UA)" if c["source"].startswith("UA") else c["name"])
     if "classes" in m and "fromSubclass" in m["classes"]:
         for c in m["classes"]["fromSubclass"]:
-        	classlist.append("{} ({})".format(c["class"]["name"] + " (UA)" if c["class"]["source"].startswith("UA") else c["class"]["name"],c["subclass"]["name"]))
+                if args.skipua and (c["class"]["source"].startswith("UA") or c["class"]["name"],c["subclass"]["name"]):
+                    continue
+                classlist.append("{} ({})".format(c["class"]["name"] + " (UA)" if c["class"]["source"].startswith("UA") else c["class"]["name"],c["subclass"]["name"]))
     classes.text = ", ".join(classlist)
 
     if "entriesHigherLevel" in m:

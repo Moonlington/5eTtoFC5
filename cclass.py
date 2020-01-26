@@ -1,3 +1,4 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import xml.etree.cElementTree as ET
 import re
 import utils
@@ -10,27 +11,26 @@ def parseClass(m, compendium, args):
 #    for eachClasss in compendium.findall('Class'):
 #        if eachClasss.find('name').text == m['name']:
 #            m['name'] = "{} (DUPLICATE IN {})".format(m['name'],m['source'])
+    stats = {"str":"Strength","dex":"Dexterity","con":"Constitution","int":"Intelligence","wis":"Wisdom","cha":"Charisma"}
+    slots=""
+    numberofSkills=""
+    if m['source'] == "UASidekicks":
+        m['hd'] = { "number": 1, "faces": 10 }
+        m["startingProficiencies"] = {'skills':[]}
+        
     Class = ET.SubElement(compendium, 'class')
     name = ET.SubElement(Class, 'name')
     name.text = m['name']
     hd = ET.SubElement(Class, 'hd')
     hd.text = str(m['hd']['faces'])
     saveProficiency = []
-    if "str" in m['proficiency']:
-        saveProficiency.append("Strength")
-    if "dex" in m['proficiency']:
-        saveProficiency.append("Dexterity")
-    if "con" in m['proficiency']:
-        saveProficiency.append("Constitution")
-    if "int" in m['proficiency']:
-        saveProficiency.append("Intelligence")
-    if "wis" in m['proficiency']:
-        saveProficiency.append("Wisdom")
-    if "cha" in m['proficiency']:
-        saveProficiency.append("Charisma")
+    for stat, value in stats.items():
+        if 'proficiency' in m and stat in m['proficiency']:
+            saveProficiency.append("{}".format(stats[stat]))
     proficiency = ET.SubElement(Class, 'proficiency')
     proficiencyList = []
     numSkills = ET.SubElement(Class, 'numSkills')
+
     for skill in m['startingProficiencies']['skills']:
         if 'choose' in skill and 'from' in skill['choose']:
             skillList = skill['choose']['from']
@@ -39,28 +39,16 @@ def parseClass(m, compendium, args):
             proficiency.text = proficiencytext
             numberofSkills = str(skill['choose']['count'])
             numSkills.text = str(skill['choose']['count'])
-    spellAbility = ET.SubElement(Class, 'spellAbility')
-    spellcastingAbility = None
-    if (spellcastingAbility is None):
-        if 'spellcastingAbility' in m:
-            if m['spellcastingAbility'] == "str":
-                spellcastingAbility = "Strength"
-            elif m['spellcastingAbility'] == "dex":
-                spellcastingAbility = "Dexterity"
-            elif m['spellcastingAbility'] == "con":
-                spellcastingAbility = "Constitution"
-            elif m['spellcastingAbility'] == "int":
-                spellcastingAbility = "Intelligence"
-            elif m['spellcastingAbility'] == "wis":
-                spellcastingAbility = "Wisdom"
-            elif m['spellcastingAbility'] == "cha":
-                spellcastingAbility = "Charisma"
-        else:
-            spellcastingAbility = ""
-            ET.tostring(ET.fromstring('<mytag/>'), short_empty_elements=False)
-    spellAbility.text = spellcastingAbility
-        
-    StartingFeature = ET.SubElement(Class, 'feature')
+     
+    spellcastingAbility = ""
+    if 'spellcastingAbility' in m:
+        spellAbility = ET.SubElement(Class, 'spellAbility')
+        spellcastingAbility = "{}".format(stats[m['spellcastingAbility']])
+        spellAbility.text = spellcastingAbility
+    myattributes = {"level":"1"}
+    autolevel = ET.SubElement(Class, 'autolevel', myattributes)
+    featureattributes={"optional": "YES"}
+    StartingFeature = ET.SubElement(autolevel, 'feature',featureattributes)
     SFName = ET.SubElement(StartingFeature, 'name')
     SFName.text = "Starting " + m['name']
     SFText = ET.SubElement(StartingFeature, 'text')
@@ -75,37 +63,86 @@ def parseClass(m, compendium, args):
         armortext = ", ".join(m['startingProficiencies']['armor'])
     else:
         armortext = "none"
-    SFText.text = "&#8226; Armor: " + armortext.title()
+    SFText.text = "• Armor: " + armortext
     SFText = ET.SubElement(StartingFeature, 'text')
     if "weapons" in m['startingProficiencies']:
         weapontext = ", ".join(m['startingProficiencies']['weapons'])
     else:
         weapontext = "none"
-    SFText.text = "&#8226; Weapons: " + weapontext.title()
+    SFText.text = "• Weapons: " + weapontext
     SFText = ET.SubElement(StartingFeature, 'text')
     if "tools" in m['startingProficiencies']:
-        SFText.text = "&#8226; Tools: " + ", ".join(m['startingProficiencies']['tools']).title()
+        SFText.text = "• Tools: " + ", ".join(m['startingProficiencies']['tools'])
     else:
-        SFText.text = "&#8226; Tools: None"
+        SFText.text = "• Tools: none"
     SFText = ET.SubElement(StartingFeature, 'text')
-    SFText.text = "&#8226; Skills: Choose " + numberofSkills + " from " + ", ".join(skillList).title()
-    SFText = ET.SubElement(StartingFeature, 'text')
-    SFText.text = ""
-    SFText = ET.SubElement(StartingFeature, 'text')
-    SFText.text = "You begin play with the following equipment, in addition to any equipment provided by your background."
-    for startingEquipment in m['startingEquipment']['default']:
-        SFText = ET.SubElement(StartingFeature, 'text')
-        SFText.text = "&#8226; " + utils.remove5eShit(startingEquipment)
-    SFText = ET.SubElement(StartingFeature, 'text')
-    SFText.text = ""
-    if "goldAlternative" in m['startingEquipment']:
-        SFText = ET.SubElement(StartingFeature, 'text')
-        SFText.text = "Alternatively, you may start with " + utils.remove5eShit(
-            m['startingEquipment']['goldAlternative']).replace('Ã—','x') + " gp and choose your own equipment."
+    if numberofSkills != "":
+        SFText.text = "• Skills: Choose " + numberofSkills + " from " + ", ".join(skillList).title()
         SFText = ET.SubElement(StartingFeature, 'text')
         SFText.text = ""
     SFText = ET.SubElement(StartingFeature, 'text')
-    SFText.text = "Source: " + m['source']
+    if 'startingEquipment' in m:
+        SFText.text = "You begin play with the following equipment, in addition to any equipment provided by your background."
+        for startingEquipment in m['startingEquipment']['default']:
+            SFText = ET.SubElement(StartingFeature, 'text')
+            SFText.text = "• " + utils.fixTags(startingEquipment,m,args.nohtml)
+        SFText = ET.SubElement(StartingFeature, 'text')
+        SFText.text = ""
+        if "goldAlternative" in m['startingEquipment']:
+            SFText = ET.SubElement(StartingFeature, 'text')
+            SFText.text = "Alternatively, you may start with " + utils.fixTags(
+                m['startingEquipment']['goldAlternative'],m,args.nohtml) + " gp and choose your own equipment."
+            SFText = ET.SubElement(StartingFeature, 'text')
+            SFText.text = ""
+    SFText = ET.SubElement(StartingFeature, 'text')
+    SFText.text = "Source: " + utils.getFriendlySource(m['source']) + ", p. " + str(m['page'])
+    if 'multiclassing' in m:
+        myattributes = {"level":"1"}
+        autolevel = ET.SubElement(Class, 'autolevel', myattributes)
+        featureattributes={"optional": "YES"}
+        StartingFeature = ET.SubElement(autolevel, 'feature',featureattributes)
+        SFName = ET.SubElement(StartingFeature, 'name')
+        SFName.text = "Multiclass " + m['name']
+        SFText = ET.SubElement(StartingFeature, 'text')
+        SFText.text = 'To multiclass as a ' + m['name'] + ', you must meet the following prerequisites:'
+        SFText = ET.SubElement(StartingFeature, 'text')
+        if 'or' in m['multiclassing']['requirements']:
+            MCrequirements={}
+            for requirement, value in m['multiclassing']['requirements']['or'][0].items():
+                MCrequirements[str(requirement)]=str(value)
+                SFText = ET.SubElement(StartingFeature, 'text')
+                SFText.text= "• {} {}".format(stats[requirement],MCrequirements[requirement])
+        else:
+            for requirement, value in m['multiclassing']['requirements'].items():
+                SFText.text = "• {} {}".format(stats[requirement],m['multiclassing']['requirements'][requirement])
+        SFText = ET.SubElement(StartingFeature, 'text')
+        SFText.text = ""
+        if 'proficienciesGained' in m['multiclassing'] or 'tools' in m['multiclassing']:
+            SFText = ET.SubElement(StartingFeature, 'text')
+            SFText.text = "You gain the following proficiencies:"
+            if 'proficienciesGained' in m['multiclassing']:
+                SFText = ET.SubElement(StartingFeature, 'text')
+                if "armor" in m['multiclassing']['proficienciesGained']:
+                    MCarmortext = ", ".join(m['multiclassing']['proficienciesGained']['armor'])
+                else:
+                    MCarmortext = "none"
+                SFText.text = "• Armor: " + MCarmortext
+                SFText = ET.SubElement(StartingFeature, 'text')
+                if "weapons" in m['multiclassing']['proficienciesGained']:
+                    MCweapontext = ", ".join(m['multiclassing']['proficienciesGained']['weapons'])
+                else:
+                    MCweapontext = "none"
+                    SFText.text = "• Weapons: " + MCweapontext
+            SFText = ET.SubElement(StartingFeature, 'text')
+            if "tools" in m['multiclassing']:
+                MCtooltext = ", ".join(m['multiclassing']['tools'])
+            else:
+                MCtooltext = "none"
+            SFText.text = "• Tools: " + MCtooltext
+            SFText = ET.SubElement(StartingFeature, 'text')
+            SFText.text = ""
+        SFText = ET.SubElement(StartingFeature, 'text')
+        SFText.text = "Source: " + utils.getFriendlySource(m['source']) + ", p. " + str(m['page'])
     armor = ET.SubElement(Class, 'armor')
     armor.text = armortext
     weapons = ET.SubElement(Class, 'weapons')
@@ -115,105 +152,90 @@ def parseClass(m, compendium, args):
         tools.text = ", ".join(m['startingProficiencies']['tools'])
     else:
         tools.text = "none"
-    if "goldAlternative" in m['startingEquipment']:
+    if 'startingEquipment' in m and "goldAlternative" in m['startingEquipment']:
         wealth = ET.SubElement(Class, 'wealth')
-        wealth.text = str(utils.remove5eShit(m['startingEquipment']['goldAlternative']).replace('Ã—','x'))
+        wealth.text = str(utils.fixTags(m['startingEquipment']['goldAlternative'],m,args.nohtml))
+    if 'casterProgression' in m:
+        FullCaster =[[3,2,0,0,0,0,0,0,0,0],[3,3,0,0,0,0,0,0,0,0],[3,4,2,0,0,0,0,0,0,0],[4,4,3,0,0,0,0,0,0,0],[4,4,3,2,0,0,0,0,0,0],[4,4,3,3,0,0,0,0,0,0],[4,4,3,3,1,0,0,0,0,0],[4,4,3,3,2,0,0,0,0,0],[4,4,3,3,3,1,0,0,0,0],[5,4,3,3,3,2,0,0,0,0],[5,4,3,3,3,2,1,0,0,0],[5,4,3,3,3,2,1,0,0,0],[5,4,3,3,3,2,1,1,0,0],[5,4,3,3,3,2,1,1,0,0],[5,4,3,3,3,2,1,1,1,0],[5,4,3,3,3,2,1,1,1,0],[5,4,3,3,3,2,1,1,1,1],[5,4,3,3,3,3,1,1,1,1],[5,4,3,3,3,3,2,1,1,1],[5,4,3,3,3,3,2,2,1,1]]
+        HalfCaster =[[0,0,0,0,0,0],[0,2,0,0,0,0],[0,3,0,0,0,0],[0,3,0,0,0,0],[0,4,2,0,0,0],[0,4,2,0,0,0],[0,4,3,0,0,0],[0,4,3,0,0,0],[0,4,3,2,0,0],[0,4,3,2,0,0],[0,4,3,3,0,0],[0,4,3,3,0,0],[0,4,3,3,1,0],[0,4,3,3,1,0],[0,4,3,3,2,0],[0,4,3,3,2,0],[0,4,3,3,3,1],[0,4,3,3,3,1],[0,4,3,3,3,2],[0,4,3,3,3,2]]
+        ThirdCaster =[[0,0,0,0,0],[0,0,0,0,0],[0,2,0,0,0],[0,3,0,0,0],[0,3,0,0,0],[0,3,0,0,0],[0,4,2,0,0],[0,4,2,0,0],[0,4,2,0,0],[0,4,3,0,0],[0,4,3,0,0],[0,4,3,0,0],[0,4,3,2,0],[0,4,3,2,0],[0,4,3,2,0],[0,4,3,3,0],[0,4,3,3,0],[0,4,3,3,0],[0,4,3,3,1],[0,4,3,3,1]]
+        #if 'Cantrips Known' in m['classTableGroups'][0]["colLabels"]:
+        #    print(m['classTableGroups'][0]["colLabels"][0])
+        #    print(type(m['classTableGroups'][0]["colLabels"][0]))
+        #    print("Cantrips are known")
+        if m['casterProgression']== 'full':
+            slots=FullCaster
+        if m['casterProgression']== '1/2':
+            slots=HalfCaster
+        if m['casterProgression']== '1/3':
+            slots=ThirdCaster
+        for table in m['classTableGroups']:
+            if "title" in table and table['title'] == "Spell Slots per Spell Level":
+                for lvl in range(len(table["rows"])):
+                    for c in table["rows"][lvl]:
+                        slots[lvl] = table["rows"][lvl]
+        for table in m['classTableGroups']:
+            cantripre = re.compile(r'{@filter ([Cc]antrips.*?)(\|.*?)?(\|.*?)?}')
+            for i in range(len(table["colLabels"])):
+                if cantripre.match(table["colLabels"][i]):
+                    cantrips = True
+                    for lvl in range(len(table["rows"])):
+                        slots[lvl].insert(0,table["rows"][lvl][i])
+                    break
+        for levelcounter in range(len(slots)):
+            while slots[levelcounter] and slots[levelcounter][-1] == 0:
+                slots[levelcounter].pop()
     level = 0
-    currentsubclassfeature = 0
-    for classFeatures in m['classFeatures']:
-        level += 1
-        for cFeat in classFeatures:
-            myattributes = {"level": str(level)}
-            autolevel = ET.SubElement(Class, 'autolevel', myattributes)
-            Feature = ET.SubElement(autolevel, 'feature')
-            Fname = ET.SubElement(Feature, 'name')
-            Fname.text = cFeat['name']
-            print(cFeat['name'])
-            for e in cFeat['entries']:
-                if "entries" in e:
-                    text = ET.SubElement(Feature, 'text')
-                    subentries = []                    
-                    for sube in e["entries"]:
-                        if type(sube) == str:
-                            subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
-                        elif type(sube) == dict and "text" in sube:
-                            subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
-                    text.text = "\n".join(subentries)
+    currentsubclass = 0
+    currentsubclassFeature = 0
+
+    for level in range(len(m['classFeatures'])):
+        if slots:
+            if slots[level]:
+                myattributes = {"level": str(level+1)}
+                autolevel = ET.SubElement(Class, 'autolevel', myattributes)
+                spellslots = ET.SubElement(autolevel, 'slots')
+                currentspellevel = level
+                spellslots.text = ", ".join(str(e) for e in slots[currentspellevel])
+        for feature in m['classFeatures'][level]:
+            if 'name' in feature:
+                if feature['name'] == "Ability Score Improvement":
+                    attributes = {}
+                    attributes = {"level": str(level+1),"scoreImprovement":"YES"}
                 else:
-                    if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
-                        for item in e["items"]:
-                            text = ET.SubElement(Feature, 'text')
-                            text.text = "{}: {}".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
-                    elif type(e) == dict and e["type"] == "list":
-                        for item in e["items"]:
-                            text = ET.SubElement(Feature, 'text')
-                            text.text = "{}".format(utils.remove5eShit(utils.fixTags(item,m)))
-                    else:
-                        text = ET.SubElement(Feature, 'text')
-                        text.text = utils.remove5eShit(utils.fixTags(e,m))
-                if 'gainSubclassFeature' in cFeat and cFeat['gainSubclassFeature']:
-                    print("Gain a Subclass Feature")
-                    currentsubclassfeature += 1
-                    for subclass in m['subclasses']:
-                        if 'name' in subclass:
-                            numberofsubclasses = 1
-                            if currentsubclassfeature==1:
-                                autolevel = ET.SubElement(Class, 'autolevel', myattributes)
-                                featureattributes={"optional": "YES"}
-                                subclassOut = ET.SubElement(autolevel, 'feature',featureattributes)
-                                text = ET.SubElement(subclassOut, 'name')
-                                text.text = subclass['name']
-                            for subclassFeature in subclass['subclassFeatures']:
-                                for entries in subclassFeature:
-                                    numberofsubclasses += 1
-                                    for e in entries['entries']:
-                                        if type(e) == str:
-                                            
-                                            text = ET.SubElement(subclassOut, 'text')
-                                            text.text = e
-                                        if "entries" in e:
-                                            if numberofsubclasses-1 == currentsubclassfeature and currentsubclassfeature == 1:
-                                                autolevel = ET.SubElement(Class, 'autolevel', myattributes)
-                                                featureattributes={"optional": "YES"}
-                                                subclassOut = ET.SubElement(autolevel, 'feature',featureattributes)
-                                                text = ET.SubElement(subclassOut, 'name')
-                                                text.text=e['name'] + ' (' + subclass['name'] + ')'
-                                                for e in e['entries']:
-                                                    if "colLabels" in e:
-                                                        text = ET.SubElement(subclassOut, 'text')
-                                                        text.text = " | ".join([utils.remove5eShit(x)
-                                                                                for x in e['colLabels']])
-                                                        for row in e['rows']:
-                                                            rowthing = []
-                                                            for r in row:
-                                                                if isinstance(r, dict) and 'roll' in r:
-                                                                    rowthing.append(
-                                                                        "{}-{}".format(
-                                                                            r['roll']['min'],
-                                                                            r['roll']['max']) if 'min' in r['roll'] else str(
-                                                                            r['roll']['exact']))
-                                                                else:
-                                                                    rowthing.append(utils.remove5eShit(r))
-                                                            text = ET.SubElement(subclassOut, 'text')
-                                                            text.text = " | ".join(rowthing)
-                                                    elif "entries" in e:
-                                                        text = ET.SubElement(subclassOut, 'text')
-                                                        subentries = []                    
-                                                        for sube in e["entries"]:
-                                                            if type(sube) == str:
-                                                                subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
-                                                            elif type(sube) == dict and "text" in sube:
-                                                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
-                                                        text.text = "\n".join(subentries)
-                                                    else:
-                                                        if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
-                                                            for item in e["items"]:
-                                                                text = ET.SubElement(subclassOut, 'text')
-                                                                text.text = "{}: {}".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
-                                                        elif type(e) == dict and e["type"] == "list":
-                                                            for item in e["items"]:
-                                                                text = ET.SubElement(subclassOut, 'text')
-                                                                text.text = "{}".format(utils.remove5eShit(utils.fixTags(item,m)))
-                                                        else:
-                                                            text = ET.SubElement(subclassOut, 'text')
-                                                            text.text = utils.remove5eShit(utils.fixTags(e,m))
+                    attributes = {}
+                    attributes = {"level": str(level+1)}
+            if args.skipua and 'source' in feature and feature['source'].startswith('UA'):
+                if args.verbose:
+                    print("Skipping UA Feature:",m['name'],feature['name'])
+                if "gainSubclassFeature" in feature and feature["gainSubclassFeature"]==True:
+                    currentsubclassFeature += 1
+                continue
+            autolevel = ET.SubElement(Class, 'autolevel', attributes)
+            attributes = {}
+            ft = ET.SubElement(autolevel, 'feature',attributes)
+            ftname = ET.SubElement(ft,'name')
+            ftname.text = utils.fixTags(feature["name"],m,args.nohtml)
+            utils.flatten_json(feature,m,ft,args, level,attributes)
+            if "gainSubclassFeature" in feature and feature["gainSubclassFeature"]==True:
+                currentsubclass=0
+                for subclass in m['subclasses']:
+                    if args.skipua and 'source' in subclass and subclass['source'].startswith('UA'):
+                        if args.verbose:
+                            print("Skipping UA Subclass:",m['name'],subclass['name'])
+                        currentsubclass += 1
+                        continue
+                    attributes = {}
+                    attributes = {"level": str(level+1)}
+                    autolevel = ET.SubElement(Class, 'autolevel', myattributes)
+                    attributes = {}
+                    attributes = {"optional": "YES"}
+                    subclassname=subclass['name']
+                    ft = ET.SubElement(autolevel, 'feature',attributes)
+                    ftname = ET.SubElement(ft,'name')
+                    ftname.text = "{} Feature ({})".format(utils.fixTags(m['subclassTitle'],m,args.nohtml),subclassname)
+                    for subfeature in subclass['subclassFeatures'][currentsubclassFeature]:
+                        utils.flatten_json(subfeature,m,ft,args, level, attributes,subclassname)
+
+                    currentsubclass += 1
+                currentsubclassFeature += 1

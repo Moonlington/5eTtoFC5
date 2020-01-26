@@ -90,6 +90,14 @@ parser.add_argument(
     default=None,
     nargs=1,
     help="update date from url")
+parser.add_argument(
+    '--skip-ua',
+    dest="skipua",
+    action='store_const',
+    default=False,
+    const=True,
+    help="skip UA content")
+
 
 
 
@@ -217,6 +225,7 @@ if args.combinedoutput:
     rdupe = 0
     cwins = 0
     closs = 0
+    cdupe = 0
 for file in args.inputJSON:
     with open(file,encoding='utf-8') as f:
         d = json.load(f)
@@ -266,8 +275,14 @@ for file in args.inputJSON:
         rdupe = 0
         cwins = 0
         closs = 0
+        cdupe = 0
     if 'monster' in d:
         for m in d['monster']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
             if m['name'] in ['Gar Shatterkeel','Shoalar Quanderil'] and m['source'] == 'LR':
                 m['original_name']=m['name']
                 m['name'] += "–"+utils.getFriendlySource(m['source'])
@@ -318,6 +333,11 @@ for file in args.inputJSON:
                 mwins += 1
     if 'vehicle' in d:
         for m in d['vehicle']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
             if m['source'].startswith("UA"):
                 m['original_name'] = m['name']
                 m['name'] += " (Unearthed Arcana)"
@@ -482,6 +502,11 @@ for file in args.inputJSON:
                 mwins += 1
     if 'spell' in d:
         for m in d['spell']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
             for xmlmon in compendium.findall("./spell[name='{}']".format(re.sub(r'\'','*',m['name']))):
                 if args.verbose or args.showdupe:
                     print ("Found duplicate entry for {} from {}".format(m['name'],xmlmon.find('source').text))
@@ -502,6 +527,11 @@ for file in args.inputJSON:
                 swins += 1
     if 'background' in d:
         for m in d['background']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
             for xmlmon in compendium.findall("./background[name='{}']".format(re.sub(r'\'','*',m['name']))):
                 if args.verbose or args.showdupe:
                     print ("Found duplicate entry for {} from {}".format(m['name'],xmlmon.find('source').text))
@@ -529,6 +559,11 @@ for file in args.inputJSON:
 
     if 'feat' in d:
         for m in d['feat']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
             if m['source'].startswith('UA'):
                 m['original_name'] = m['name']
                 m['name'] = m['name'] + " (UA)"
@@ -553,6 +588,11 @@ for file in args.inputJSON:
 
     if 'race' in d:
         for race in d['race']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
             m = copy.deepcopy(race)
             if m['source'].startswith('UA'):
                 m['original_name'] = m['name']
@@ -575,6 +615,11 @@ for file in args.inputJSON:
                     m['image'] = utils.findFluffImage(fluff,m['name'],'race')
             if 'subraces' in m:
                 for sub in m['subraces']:
+                    if args.skipua:
+                        if 'source' in sub and sub['source'].startswith('UA'):
+                            if args.verbose:
+                                print("Skipping UA Content: ",sub['name'])
+                    continue
                     sr = copy.deepcopy(m)
                     if "source" in sub and "source" in sr:
                         del sr["source"]
@@ -648,6 +693,18 @@ for file in args.inputJSON:
                     rwins += 1
     if 'class' in d:
         for m in d['class']:
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
+            if m['source'].startswith('UA'):
+                m['original_name'] = m['name']
+                m['name'] = m['name'] + " (UA)"
+            for xmlmon in compendium.findall("./class[name='{}']".format(re.sub(r'\'','*',m['name']))):
+                if args.verbose or args.showdupe:
+                    print ("Found duplicate entry for {}".format(m['name']))
+                cdupe += 1
             if ignoreError:
                 try:
                     parseClass(m, compendium, args)
@@ -836,7 +893,7 @@ for file in args.inputJSON:
         if cwins > 0 or closs > 0:
             print("Converted {}/{} classes (failed {})".format(cwins, cwins +
                                                             closs, closs) if ignoreError else "Converted {} classes".format(cwins))
-
+            if cdupe > 0: print(" ({} duplicate{})".format(cdupe,"s" if cdupe > 1 else ""))
         if iwins > 0 or iloss > 0:
             print("Converted {}/{} items (failed {})".format(iwins, iwins +
                                                             iloss, iloss) if ignoreError else "Converted {} items".format(iwins))
@@ -874,6 +931,7 @@ if args.combinedoutput:
     if cwins > 0 or closs > 0:
         print("Converted {}/{} classes (failed {})".format(cwins, cwins + closs,
                                                         closs) if ignoreError else "Converted {} classes".format(cwins))
+        if cdupe > 0: print(" ({} duplicate{})".format(cdupe,"s" if cdupe > 1 else ""))
     if iwins > 0 or iloss > 0:
         print("Converted {}/{} items (failed {})".format(iwins, iwins + iloss,
                                                         iloss) if ignoreError else "Converted {} items".format(iwins))
