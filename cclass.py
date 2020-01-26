@@ -192,18 +192,16 @@ def parseClass(m, compendium, args):
     for level in range(len(m['classFeatures'])):
         if slots:
             if slots[level]:
-                myattributes = {"level": str(level+1)}
-                autolevel = ET.SubElement(Class, 'autolevel', myattributes)
+                attributes = {"level": str(level+1)}
+                autolevel = ET.SubElement(Class, 'autolevel', attributes)
                 spellslots = ET.SubElement(autolevel, 'slots')
                 currentspellevel = level
                 spellslots.text = ", ".join(str(e) for e in slots[currentspellevel])
         for feature in m['classFeatures'][level]:
             if 'name' in feature:
                 if feature['name'] == "Ability Score Improvement":
-                    attributes = {}
                     attributes = {"level": str(level+1),"scoreImprovement":"YES"}
                 else:
-                    attributes = {}
                     attributes = {"level": str(level+1)}
             if args.skipua and 'source' in feature and feature['source'].startswith('UA'):
                 if args.verbose:
@@ -225,10 +223,8 @@ def parseClass(m, compendium, args):
                             print("Skipping UA Subclass:",m['name'],subclass['name'])
                         currentsubclass += 1
                         continue
-                    attributes = {}
                     attributes = {"level": str(level+1)}
-                    autolevel = ET.SubElement(Class, 'autolevel', myattributes)
-                    attributes = {}
+                    autolevel = ET.SubElement(Class, 'autolevel', attributes)
                     attributes = {"optional": "YES"}
                     subclassname=subclass['name']
                     ft = ET.SubElement(autolevel, 'feature',attributes)
@@ -236,6 +232,5 @@ def parseClass(m, compendium, args):
                     ftname.text = "{} Feature ({})".format(utils.fixTags(m['subclassTitle'],m,args.nohtml),subclassname)
                     for subfeature in subclass['subclassFeatures'][currentsubclassFeature]:
                         utils.flatten_json(subfeature,m,ft,args, level, attributes,subclassname)
-
                     currentsubclass += 1
                 currentsubclassFeature += 1
