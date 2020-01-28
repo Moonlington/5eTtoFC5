@@ -114,11 +114,17 @@ def parseSpell(m, compendium, args):
         for c in m["classes"]["fromClassList"]:
                 if args.skipua and c['source'].startswith('UA'):
                     continue
+                if args.onlyofficial:
+                    if c['source'] not in args.onlyofficial:
+                        continue
                 classlist.append(c["name"] + " (UA)" if c["source"].startswith("UA") else c["name"])
     if "classes" in m and "fromSubclass" in m["classes"]:
         for c in m["classes"]["fromSubclass"]:
-                if args.skipua and (c["class"]["source"].startswith("UA") or c["class"]["name"],c["subclass"]["name"]):
+                if args.skipua and (c["class"]["source"].startswith("UA") or c["subclass"]["source"].startswith("UA")):
                     continue
+                if args.onlyofficial:
+                    if c["class"]["source"] not in args.onlyofficial or c["subclass"]["source"] not in args.onlyofficial:
+                        continue
                 classlist.append("{} ({})".format(c["class"]["name"] + " (UA)" if c["class"]["source"].startswith("UA") else c["class"]["name"],c["subclass"]["name"]))
     classes.text = ", ".join(classlist)
 

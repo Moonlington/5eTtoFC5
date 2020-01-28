@@ -97,11 +97,51 @@ parser.add_argument(
     default=False,
     const=True,
     help="skip UA content")
-
-
-
-
-
+officialsources = [
+        "PHB",
+	"MM",
+	"DMG",
+	"SCAG",
+	"VGM",
+	"XGE",
+	"MTF",
+	"GGR",
+	"AI",
+	"ERLW",
+	"RMR",
+        "LMoP",
+        "HotDQ",
+        "RoT",
+        "PotA",
+        "OotA",
+        "CoS",
+        "SKT",
+        "TftYP",
+        "ToA",
+        "TTP",
+        "WDH",
+        "WDMM",
+        "KKW",
+        "LLK",
+        "GoS",
+        "OoW",
+        "DIP",
+        "HftT",
+        "DC",
+        "SLW",
+        "SDW",
+        "BGDIA",
+        "RMBRE",
+        "SADS",
+        "MFF"
+        ]
+parser.add_argument(
+    '--only-official',
+    dest="onlyofficial",
+    action='store_const',
+    default=None,
+    const=officialsources,
+    help="only include officially released content from: " + ", ".join([utils.getFriendlySource(x) for x in officialsources]) )
 
 args = parser.parse_args()
 
@@ -283,6 +323,11 @@ for file in args.inputJSON:
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
                     continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
+                    continue
             if m['name'] in ['Gar Shatterkeel','Shoalar Quanderil'] and m['source'] == 'LR':
                 m['original_name']=m['name']
                 m['name'] += "–"+utils.getFriendlySource(m['source'])
@@ -337,6 +382,11 @@ for file in args.inputJSON:
                 if m['source'].startswith('UA'):
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
+                    continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
                     continue
             if m['source'].startswith("UA"):
                 m['original_name'] = m['name']
@@ -507,6 +557,11 @@ for file in args.inputJSON:
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
                     continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
+                    continue
             for xmlmon in compendium.findall("./spell[name='{}']".format(re.sub(r'\'','*',m['name']))):
                 if args.verbose or args.showdupe:
                     print ("Found duplicate entry for {} from {}".format(m['name'],xmlmon.find('source').text))
@@ -531,6 +586,11 @@ for file in args.inputJSON:
                 if m['source'].startswith('UA'):
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
+                    continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
                     continue
             for xmlmon in compendium.findall("./background[name='{}']".format(re.sub(r'\'','*',m['name']))):
                 if args.verbose or args.showdupe:
@@ -564,6 +624,11 @@ for file in args.inputJSON:
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
                     continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
+                    continue
             if m['source'].startswith('UA'):
                 m['original_name'] = m['name']
                 m['name'] = m['name'] + " (UA)"
@@ -594,6 +659,11 @@ for file in args.inputJSON:
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
                     continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
+                    continue
             if m['source'].startswith('UA'):
                 m['original_name'] = m['name']
                 if m['source'] == "UARacesOfEberron":
@@ -619,6 +689,11 @@ for file in args.inputJSON:
                         if 'source' in sub and sub['source'].startswith('UA'):
                             if args.verbose:
                                 print("Skipping UA Content: Subrace ",sub['name'] if 'name' in sub else m['name'])
+                            continue
+                    if args.onlyofficial:
+                        if 'source' in sub and sub['source'] not in args.onlyofficial:
+                            if args.verbose:
+                                print("Skipping unoffical content: {} from {}".format(sub['name'],utils.getFriendlySource(sub['source'])))
                             continue
                     sr = copy.deepcopy(m)
                     if "source" in sub and "source" in sr:
@@ -698,6 +773,11 @@ for file in args.inputJSON:
                     if args.verbose:
                         print("Skipping UA Content: ",m['name'])
                     continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
+                    continue
             if m['source'].startswith('UA'):
                 m['original_name'] = m['name']
                 m['name'] = m['name'] + " (UA)"
@@ -724,7 +804,16 @@ for file in args.inputJSON:
                 if args.verbose:
                     print ("SKIPPING",m['age'],"ITEM:",m['name'])
                 continue
-
+            if args.skipua:
+                if m['source'].startswith('UA'):
+                    if args.verbose:
+                        print("Skipping UA Content: ",m['name'])
+                    continue
+            if args.onlyofficial:
+                if m['source'] not in args.onlyofficial:
+                    if args.verbose:
+                        print("Skipping unoffical content: {} from {}".format(m['name'],utils.getFriendlySource(m['source'])))
+                    continue
             if m['name'] == "Trinket" and m['source'] == "CoS":
                 m['name'] += " (Gothic)"
             elif m['name'] == "Trinket" and m['source'] == "EET":
