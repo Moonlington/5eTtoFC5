@@ -613,6 +613,8 @@ def getFriendlySource(source):
         friendly = "Adventure with Muk"
     elif source == "OGA":
         friendly = "One Grung Above"
+    elif source == "Twitter":
+        friendly = "Twitter"
     elif source.startswith("UA"):
         friendly = re.sub(r"(\w)([A-Z])", r"\1 \2", friendly)
         friendly = re.sub(r"U A", r"Unearthed Arcana: ", friendly)
@@ -639,87 +641,3 @@ def getFriendlySource(source):
     if not srcfound:
         print("Could not find source: " + source)
     return friendly
-
-
-
-def flatten_json(nested_json, d, Class, args, level, attributes,subclassname=''):
-    import xml.etree.cElementTree as ET
-
-    def flatten(x, m, args, name=''):
-        if args.skipua and 'source' in m and m['source'].startswith('UA'):
-            if args.verbose:
-                print("Skipping UA Content: ",m['name'])
-            return
-        skip=False
-        options=False
-        if type(x) is str:
-                subtitle=''
-                if name=="name":
-                    text = ET.SubElement(m, 'text')
-                    #print(str(x))
-                    #print(str(m))
-                    text.text = fixTags(x,m,args.nohtml)
-                elif name=="text":
-                    text = ET.SubElement(m, 'text')
-                    text.text = fixTags(x,m,args.nohtml)
-                elif name=="list":
-                    text = ET.SubElement(m, 'text')
-                    text.text = "• " + fixTags(x,m,args.nohtml)
-                else:
-                    text = ET.SubElement(m, 'text')
-                    text.text = fixTags(x,m,args.nohtml)
-        elif type(x) is dict:
-            if "type" in x:
-                if x['type']=='abilityDc' or x['type']=='abilityAttackMod':
-                    skip=True
-            if not skip:
-                if "name" in x:
-                    if 'subclassTitle' in d and d['subclassTitle'] and 'optional' in attributes:
-                        if subclassname:
-                            SubClassFeatureName = x['name'] + " ("  + subclassname + ")"
-                            flatten(SubClassFeatureName, m, args, "text")
-                        else:
-                            SubClassFeatureName = d['subclassTitle'] + ": " + x[a]
-                    else:
-                        flatten(x['name'], m, args, "text")
-                for a in x:
-                    if a=="type" and x[a]=="list" and "style" in x and x["style"] == "list-hang-notitle":
-                        blank = ET.SubElement(m, 'text')
-                        blank.text = ""
-                        for item in x["items"]:
-                            flatten(item['name'], m, args, "text")
-                            flatten(item['entry'], m, args, "list")
-                            blank = ET.SubElement(m, 'text')
-                            blank.text = ""
-                    elif "colLabels" in x:
-                        text = ET.SubElement(m, 'text')
-                        text.text = " | ".join([remove5eShit(y)
-                                                for y in x['colLabels']])
-                        for row in x['rows']:
-                            rowthing = []
-                            for r in row:
-                                if isinstance(r, dict) and 'roll' in r:
-                                    rowthing.append(
-                                        "{}-{}".format(
-                                            r['roll']['min'],
-                                            r['roll']['max']) if 'min' in r['roll'] else str(
-                                            r['roll']['exact']))
-                                else:
-                                    rowthing.append(remove5eShit(r))
-                            text = ET.SubElement(m, 'text')
-                            text.text = " | ".join(rowthing)
-                    elif "type" in a and x[a]=="list":
-                        flatten(x['items'], m, args, "list")
-                    elif a=="entries":
-                        flatten(x[a], m, args, "text")
-        elif type(x) is list:
-            i = 0
-            for a in x:
-                flatten(a, m, args, name)
-                i += 1
-    if Class.tag == 'class':
-        n = ET.SubElement(Class, 'autolevel', attributes)
-    else:
-        n = Class
-    flatten(nested_json, n, args)
-
