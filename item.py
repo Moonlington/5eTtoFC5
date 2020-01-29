@@ -5,7 +5,7 @@ import utils
 import json
 import os
 from slugify import slugify
-from wand.image import Image
+from shutil import copyfile
 
 def parseItem(m, compendium, args):
     if '_copy' in m:
@@ -282,27 +282,33 @@ def parseItem(m, compendium, args):
 
     if 'source' in m:
         slug = slugify(m["name"])
-        if args.addimgs and os.path.isdir("./img") and not os.path.isfile("./items/" + slug + ".png"):
-            if not os.path.isdir("./items/"):
-                os.mkdir("./items/")
-            artworkpath = None
-            if os.path.isfile("./img/items/" + m["name"] + ".jpg"):
-                artworkpath = "./img/items/" + m["name"] + ".jpg"
-            elif os.path.isfile("./img/items/" + m["name"] + ".png"):
-                artworkpath = "./img/items/" + m["name"] + ".png"
-            elif os.path.isfile("./img/items/" + m["source"] + "/" + m["name"] + ".png"):
-                artworkpath = "./img/items/" + m["source"] + "/" + m["name"] + ".png"
+        if args.addimgs and os.path.isdir("img") and not os.path.isfile(os.path.join(args.tempdir,"items", slug + ".png")) and not os.path.isfile(os.path.join(args.tempdir,"items",slug+".jpg")):
+            if not os.path.isdir(os.path.join(args.tempdir,"items")):
+                os.mkdir(os.path.join(args.tempdir,"items"))
+            if 'image' in m:
+                artworkpath = m['image']
+            else:
+                artworkpath = None
+            itemname = m["original_name"] if "original_name" in m else m["name"]
+            if artworkpath and os.path.isfile("./img/" + artworkpath):
+                artworkpath = "./img/" + artworkpath
+            elif os.path.isfile("./img/items/" + m["source"] + "/" + itemname + ".jpg"):
+                artworkpath = "./img/items/" + m["source"] + "/" + itemname + ".jpg"
+            elif os.path.isfile("./img/items/" + m["source"] + "/" + itemname + ".png"):
+                artworkpath = "./img/items/" + m["source"] + "/" + itemname + ".png"
+            elif os.path.isfile("./img/" + m["source"] + "/" + itemname + ".png"):
+                artworkpath = "./img/" + m["source"] + "/" + itemname + ".png"
             if artworkpath is not None:
-                if args.verbose:
-                    print("Converting Image: " + artworkpath)
-                with Image(filename=artworkpath) as img:
-                    img.format='png'
-                    img.save(filename="./items/" + slug + ".png")
-                    imagetag = ET.SubElement(itm, 'image')
-                    imagetag.text = slug + ".png"
-        elif args.addimgs and os.path.isfile("./items/" + slug + ".png"):
+                ext = os.path.splitext(artworkpath)[1]
+                copyfile(artworkpath, os.path.join(args.tempdir,"items",slug + ext))
+                imagetag = ET.SubElement(itm, 'image')
+                imagetag.text = slug + ext
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", slug + ".png")):
             imagetag = ET.SubElement(itm, 'image')
             imagetag.text = slug + ".png"
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", slug + ".jpg")):
+            imagetag = ET.SubElement(itm, 'image')
+            imagetag.text = slug + ".jpg"
 
         #source = ET.SubElement(itm, 'source')
         sourcetext = "{} p. {}".format(

@@ -41,6 +41,8 @@ def parseSpell(m, compendium, args):
             image.text = "necromancy.png"
         elif m['school'] == 'T':
             image.text = "transmutation.png"
+        elif m['school'] == 'P':
+            image.text = "psionic.png"
 
     ritual = ET.SubElement(spell, 'ritual')
     if "meta" in m and "ritual" in m["meta"] and m["meta"]["ritual"]:

@@ -7,6 +7,8 @@ import os
 import argparse
 import copy
 import requests
+import tempfile
+import shutil
 
 import utils
 from monster import parseMonster
@@ -98,43 +100,43 @@ parser.add_argument(
     const=True,
     help="skip UA content")
 officialsources = [
-        "PHB",
-	"MM",
-	"DMG",
-	"SCAG",
-	"VGM",
-	"XGE",
-	"MTF",
-	"GGR",
-	"AI",
-	"ERLW",
-	"RMR",
-        "LMoP",
-        "HotDQ",
-        "RoT",
-        "PotA",
-        "OotA",
-        "CoS",
-        "SKT",
-        "TftYP",
-        "ToA",
-        "TTP",
-        "WDH",
-        "WDMM",
-        "KKW",
-        "LLK",
-        "GoS",
-        "OoW",
-        "DIP",
-        "HftT",
-        "DC",
-        "SLW",
-        "SDW",
-        "BGDIA",
-        "RMBRE",
-        "SADS",
-        "MFF"
-        ]
+    "PHB",
+    "MM",
+    "DMG",
+    "SCAG",
+    "VGM",
+    "XGE",
+    "MTF",
+    "GGR",
+    "AI",
+    "ERLW",
+    "RMR",
+    "LMoP",
+    "HotDQ",
+    "RoT",
+    "PotA",
+    "OotA",
+    "CoS",
+    "SKT",
+    "TftYP",
+    "ToA",
+    "TTP",
+    "WDH",
+    "WDMM",
+    "KKW",
+    "LLK",
+    "GoS",
+    "OoW",
+    "DIP",
+    "HftT",
+    "DC",
+    "SLW",
+    "SDW",
+    "BGDIA",
+    "RMBRE",
+    "SADS",
+    "MFF"
+    ]
 parser.add_argument(
     '--only-official',
     dest="onlyofficial",
@@ -142,9 +144,20 @@ parser.add_argument(
     default=None,
     const=officialsources,
     help="only include officially released content from: " + ", ".join([utils.getFriendlySource(x) for x in officialsources]) )
-
+parser.add_argument(
+    '--temp-dir',
+    dest="tempdir",
+    action='store',
+    default=None,
+    help="directory to use for temporary files when generating Encounter+ compendium" )
 args = parser.parse_args()
-
+tempdir = None
+if args.combinedoutput and args.combinedoutput.endswith(".compendium"):
+    if not args.tempdir:
+        tempdir = tempfile.TemporaryDirectory(prefix="5eToE_")
+        args.tempdir = tempdir.name
+if not args.tempdir:
+    args.tempdir = "."
 if args.updatedata:
     if not args.updatedata[0].startswith("http"):
         baseurl = "https://{}/data".format(args.updatedata[0].rstrip('/'))
@@ -1041,4 +1054,18 @@ if args.combinedoutput:
 
     # write to file
     tree = ET.ElementTree(utils.indent(compendium, 1))
-    tree.write(args.combinedoutput, xml_declaration=True, short_empty_elements=False, encoding='utf-8')
+    if args.combinedoutput.endswith(".compendium"):
+        if mwins == 0 and swins == 0 and iwins == 0:
+            print ("Nothing to output")
+        else:
+            if args.addimgs and os.path.isdir("spells") and swins > 0: shutil.copytree("spells",  os.path.join(args.tempdir,"spells"))
+            tree.write(os.path.join(args.tempdir,"compendium.xml"), xml_declaration=True, short_empty_elements=False, encoding='utf-8')
+            zipfile = shutil.make_archive(args.combinedoutput,"zip",args.tempdir)
+            shutil.move(zipfile,args.combinedoutput)
+            if tempdir:
+                tempdir.cleanup()
+    else:
+        if mwins == 0 and swins == 0 and iwins == 0 and fwins == 0 and bwins == 0 and rwins == 0 and cwins == 0:
+            print("Nothing to output")
+        else:
+            tree.write(args.combinedoutput, xml_declaration=True, short_empty_elements=False, encoding='utf-8')

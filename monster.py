@@ -6,7 +6,6 @@ import json
 import os
 import copy
 from slugify import slugify
-#from wand.image import Image
 from shutil import copyfile
 
 def parseMonster(m, compendium, args):
@@ -113,11 +112,11 @@ def parseMonster(m, compendium, args):
             if len(acstr) == 0:
                 acstr.append(str(acs['ac']))
                 if 'from' in acs and 'condition' in acs:
-                    acstr.append(utils.fixTags(", ".join(acs['from']) + " " + acs['condition'],m,args.nohtml))
+                    acstr.append(utils.fixTags(", ".join(acs['from']) + " " + acs['condition'],m,True))
                 elif 'from' in acs:
-                    acstr.append(utils.fixTags(", ".join(acs['from']),m,args.nohtml))
+                    acstr.append(utils.fixTags(", ".join(acs['from']),m,True))
                 elif 'condition' in acs:
-                    acstr.append(utils.fixTags(acs['condition'],m,args.nohtml))
+                    acstr.append(utils.fixTags(acs['condition'],m,True))
                 continue
             acstr.append(utils.fixTags("{}".format(
                 "{} {}".format(
@@ -125,7 +124,7 @@ def parseMonster(m, compendium, args):
                     "("+", ".join(acs['from']) + ") " + acs['condition'] if 'from' in acs and 'condition' in acs else
                     "("+", ".join(acs['from'])+")" if 'from' in acs else
                     acs['condition']
-                    ) if 'from' in acs or 'condition' in acs else acs['ac']),m,args.nohtml))
+                    ) if 'from' in acs or 'condition' in acs else acs['ac']),m,True))
         else:
             acstr.append(str(acs))
     ac.text = "{} ({})".format(acstr[0],", ".join(acstr[1:])) if len(acstr) > 1 else acstr[0]
@@ -260,9 +259,9 @@ def parseMonster(m, compendium, args):
 
     if 'source' in m:
         slug = slugify(m["name"])
-        if args.addimgs and os.path.isdir("./img") and not os.path.isfile("./monsters/" + slug + ".png"):
-            if not os.path.isdir("./monsters/"):
-                os.mkdir("./monsters/")
+        if args.addimgs and os.path.isdir("img") and not os.path.isfile(os.path.join(args.tempdir,"monsters", slug + ".png")) and not os.path.isfile(os.path.join(args.tempdir,"monsters",slug+".jpg")):
+            if not os.path.isdir(os.path.join(args.tempdir,"monsters")):
+                os.mkdir(os.path.join(args.tempdir,"monsters"))
             if 'image' in m:
                 artworkpath = m['image']
             else:
@@ -277,17 +276,16 @@ def parseMonster(m, compendium, args):
             elif os.path.isfile("./img/" + m["source"] + "/" + monstername + ".png"):
                 artworkpath = "./img/" + m["source"] + "/" + monstername + ".png"
             if artworkpath is not None:
-                copyfile(artworkpath, "./monsters/" + slug + os.path.splitext(artworkpath)[1])
+                ext = os.path.splitext(artworkpath)[1]
+                copyfile(artworkpath, os.path.join(args.tempdir,"monsters",slug + ext))
                 imagetag = ET.SubElement(monster, 'image')
-                imagetag.text = slug + os.path.splitext(artworkpath)[1]
-#                with Image(filename=artworkpath) as img:
-#                    img.format='png'
-#                    img.save(filename="./monsters/" + slug + ".png")
-#                    imagetag = ET.SubElement(monster, 'image')
-#                    imagetag.text = slug + ".png"
-        elif args.addimgs and os.path.isfile("./monsters/" + slug + ".png"):
+                imagetag.text = slug + ext
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"monsters", slug + ".png")):
             imagetag = ET.SubElement(monster, 'image')
             imagetag.text = slug + ".png"
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"monsters", slug + ".jpg")):
+            imagetag = ET.SubElement(monster, 'image')
+            imagetag.text = slug + ".jpg"
 
         sourcetext = "{} p. {}".format(
             utils.getFriendlySource(m['source']), m['page']) if 'page' in m and m['page'] != 0 else utils.getFriendlySource(m['source'])
