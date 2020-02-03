@@ -60,7 +60,7 @@ def parseClass(m, compendium, args):
     SFText.text = "You are proficient with the following items, in addition to any proficiencies provided by your race or background."
     SFText = ET.SubElement(StartingFeature, 'text')
     if "armor" in m['startingProficiencies']:
-        armortext = ", ".join(m['startingProficiencies']['armor'])
+        armortext = ", ".join([x if type(x) == str else x['full'] for x in m['startingProficiencies']['armor']])
     else:
         armortext = "none"
     SFText.text = "• Armor: " + armortext
@@ -123,7 +123,7 @@ def parseClass(m, compendium, args):
             if 'proficienciesGained' in m['multiclassing']:
                 SFText = ET.SubElement(StartingFeature, 'text')
                 if "armor" in m['multiclassing']['proficienciesGained']:
-                    MCarmortext = ", ".join(m['multiclassing']['proficienciesGained']['armor'])
+                    MCarmortext = ", ".join([x if type(x) == str else x['full'] for x in m['multiclassing']['proficienciesGained']['armor']])
                 else:
                     MCarmortext = "none"
                 SFText.text = "• Armor: " + MCarmortext
@@ -165,10 +165,12 @@ def parseClass(m, compendium, args):
         #    print("Cantrips are known")
         if m['casterProgression']== 'full':
             slots=FullCaster
-        if m['casterProgression']== '1/2':
+        elif m['casterProgression']== '1/2':
             slots=HalfCaster
-        if m['casterProgression']== '1/3':
+        elif m['casterProgression']== '1/3':
             slots=ThirdCaster
+        else:
+            slots=[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
         for table in m['classTableGroups']:
             if "title" in table and table['title'] == "Spell Slots per Spell Level":
                 for lvl in range(len(table["rows"])):

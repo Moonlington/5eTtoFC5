@@ -178,6 +178,7 @@ def modifyMonster(m,mods):
         elif mod == 'trait' or mod == 'action' or mod == 'reaction' or mod == 'legendary':
             if mod not in m:
                 m[mod] = []
+            m[mod] = modTraits(m[mod],mods[mod])
         elif mod == 'spellcasting' or mod == 'languages' or mod == 'resist' or mod == "variant" or mod == "immune" or mod == "conditionImmune" or mod == "vulnerable":
             if mod not in m:
                 m[mod] = []
@@ -297,7 +298,6 @@ def modifyItem(m,mods):
     return m
 
 def modTraits(trait,mod):
-    print(trait,mod)
     if type(mod) == list:
         for mt in range(len(mod)):
             trait = modTraits(trait,mod[mt])
