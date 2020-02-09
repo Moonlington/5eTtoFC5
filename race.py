@@ -154,7 +154,7 @@ def parseRace(m, compendium, args):
                                         r['roll']['max']) if 'min' in r['roll'] else str(
                                         r['roll']['exact']))
                             else:
-                                rowthing.append(utils.remove5eShit(str(r)))
+                                rowthing.append(utils.fixTags(str(r),m,args.nohtml))
                         text.text += " | ".join(rowthing) + "\n"
                 elif "entries" in e:
                     subentries = []
@@ -205,7 +205,7 @@ def parseRace(m, compendium, args):
                                                     r['roll']['max']) if 'min' in r['roll'] else str(
                                                     r['roll']['exact']))
                                         else:
-                                            rowthing.append(utils.remove5eShit(str(r)))
+                                            rowthing.append(utils.fixTags(str(r),m,args.nohtml))
                                     tabletext += " | ".join(rowthing) + "\n"
                                 subentries.append(tabletext)
 

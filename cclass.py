@@ -350,7 +350,7 @@ def flatten_json(nested_json, d, Class, args, level, attributes,subclassname='')
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(str(r),m,args.nohtml))
                             text = ET.SubElement(m, 'text')
                             text.text = " | ".join(rowthing)
                     elif "type" in a and x[a]=="list":

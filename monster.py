@@ -328,7 +328,7 @@ def parseMonster(m, compendium, args):
                                         r['roll']['max']) if 'min' in r['roll'] else str(
                                         r['roll']['exact']))
                             else:
-                                rowthing.append(utils.remove5eShit(r))
+                                rowthing.append(utils.fixTags(r,m,args.nohtml))
                         text = ET.SubElement(trait, 'text')
                         text.text = " | ".join(rowthing)
                 elif "entries" in e:
@@ -398,7 +398,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(action, 'text')
                             text.text = " | ".join(rowthing)
                     elif "entries" in e:
@@ -476,7 +476,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(action, 'text')
                             text.text = " | ".join(rowthing)
                     elif "entries" in e:
@@ -543,7 +543,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(action, 'text')
                             text.text = " | ".join(rowthing)
                     elif "entries" in e:
@@ -658,7 +658,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(legendary, 'text')
                             text.text = " | ".join(rowthing)
                     else:
@@ -723,7 +723,7 @@ def parseMonster(m, compendium, args):
                                                     r['roll']['max']) if 'min' in r['roll'] else str(
                                                     r['roll']['exact']))
                                         else:
-                                            rowthing.append(utils.remove5eShit(r))
+                                            rowthing.append(utils.fixTags(r,m,args.nohtml))
                                     text = ET.SubElement(legendary, 'text')
                                     text.text = " | ".join(rowthing)
                             else:
@@ -781,7 +781,7 @@ def parseMonster(m, compendium, args):
                                                     r['roll']['max']) if 'min' in r['roll'] else str(
                                                     r['roll']['exact']))
                                         else:
-                                            rowthing.append(utils.remove5eShit(r))
+                                            rowthing.append(utils.fixTags(r,m,args.nohtml))
                                     text = ET.SubElement(legendary, 'text')
                                     text.text = " | ".join(rowthing)
                             else:
@@ -896,7 +896,7 @@ def parseMonster(m, compendium, args):
                                                 r['roll']['max']) if 'min' in r['roll'] else str(
                                                 r['roll']['exact']))
                                     else:
-                                        rowthing.append(utils.remove5eShit(r))
+                                        rowthing.append(utils.fixTags(r,m,args.nohtml))
                                 description.text += " | ".join(rowthing) + "\n"
                         elif "entries" in e:
                             subentries = []                    

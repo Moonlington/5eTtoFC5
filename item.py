@@ -348,7 +348,7 @@ def parseItem(m, compendium, args):
                                     r['roll']['max']) if 'min' in r['roll'] else str(
                                     r['roll']['exact']))
                         else:
-                            rowthing.append(utils.remove5eShit(str(r)))
+                            rowthing.append(utils.fixTags(str(r),m,args.nohtml))
                     bodyText.text += " | ".join(rowthing) + "\n"
             elif "entries" in e:
                 subentries = []
