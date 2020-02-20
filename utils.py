@@ -615,6 +615,8 @@ def getFriendlySource(source):
         friendly = "One Grung Above"
     elif source == "Twitter":
         friendly = "Twitter"
+    elif source == "ESL":
+        friendly = "Essentials Kit"
     elif source.startswith("UA"):
         friendly = re.sub(r"(\w)([A-Z])", r"\1 \2", friendly)
         friendly = re.sub(r"U A", r"Unearthed Arcana: ", friendly)

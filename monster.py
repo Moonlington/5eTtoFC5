@@ -194,7 +194,9 @@ def parseMonster(m, compendium, args):
     statwis.text = str(m['wis'])
     statcha = ET.SubElement(monster, 'cha')
     statcha.text = str(m['cha'])
-
+    if 'isNpc' in m and m['isNpc'] and not args.nohtml:
+        npcroll = ET.SubElement(monster, 'role')
+        npcroll.text = "ally"
     save = ET.SubElement(monster, 'save')
     if 'save' in m:
         save.text = ", ".join(["{} {}".format(str.capitalize(
