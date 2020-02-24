@@ -377,7 +377,7 @@ def modList(items,mod):
             if 'names' in mod:
                 items = [ item for item in items if item not in mod['names'] ]
             elif 'items' in mod:
-                items = [ item for item in items if item not in mod['items'] ]
+                items = [ item for item in items if type(item) != str or item not in mod['items'] ]
             else:
                 print("Unhandled mode: " + mod['mode'],mod)
         elif mod['mode'] == 'insertArr':
@@ -615,7 +615,7 @@ def getFriendlySource(source):
         friendly = "One Grung Above"
     elif source == "Twitter":
         friendly = "Twitter"
-    elif source == "ESL":
+    elif source == "ESK":
         friendly = "Essentials Kit"
     elif source.startswith("UA"):
         friendly = re.sub(r"(\w)([A-Z])", r"\1 \2", friendly)
