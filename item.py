@@ -1,17 +1,13 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import xml.etree.cElementTree as ET
 import re
 import utils
 import json
 import os
 from slugify import slugify
-from wand.image import Image
+from shutil import copyfile
 
-excludedages = ['futuristic','modern','renaissance']
 def parseItem(m, compendium, args):
-    if 'age' in m and m['age'].lower() in excludedages:
-        if args.verbose:
-            print ("SKIPPING",m['age'],"ITEM:",m['name'])
-        return
     if '_copy' in m:
         if args.verbose:
             print("COPY: " + m['name'] + " from " + m['_copy']['name'] + " in " + m['_copy']['source'])
@@ -81,6 +77,9 @@ def parseItem(m, compendium, args):
             typ.text = 'G'
         if m['type'] == "VEH":
             typ.text = 'G'
+        if m['type'] == 'GV':
+            typ.text = 'G'
+            headings.append("Generic Variant")
 
     if 'wondrous' in m and m['wondrous']:
         headings.append("Wondrous item")
@@ -94,14 +93,17 @@ def parseItem(m, compendium, args):
     weight = ET.SubElement(itm, 'weight')
     if 'weight' in m: weight.text = str(m['weight'])
 
-    rarity = ET.SubElement(itm, 'rarity')
-    if 'rarity' in m:
+    if 'rarity' in m and m['rarity'] != 'None' and m['rarity'] != 'Unknown' and not args.nohtml:
+        rarity = ET.SubElement(itm, 'rarity')
         rarity.text = str(m['rarity'])
         if m['rarity'] != 'None' and m['rarity'] != 'Unknown': headings.append(m['rarity'])
 
-    value = ET.SubElement(itm, 'value')
+
     if 'value' in m:
-        if m['value'] >= 100:
+        value = ET.SubElement(itm, 'value')
+        if args.nohtml:
+            value.text = str(m['value']/100)
+        elif m['value'] >= 100:
             value.text = "{:g} gp".format(m['value']/100)
         elif m['value'] >= 10:
             value.text = "{:g} sp".format(m['value']/10)
@@ -165,163 +167,168 @@ def parseItem(m, compendium, args):
             headings.append('Tack and Harness')
         elif m['type'] == 'OTH':
             headings.append('Other')
-    attunement = ET.SubElement(itm, 'attunement')
-    if 'reqAttune' in m:
-        if m['reqAttune'] == True:
-            attunement.text = "Requires Attunement"
+    if not args.nohtml:
+        attunement = ET.SubElement(itm, 'attunement')
+        if 'reqAttune' in m:
+            if m['reqAttune'] == True:
+                attunement.text = "Requires Attunement"
+            else:
+                attunement.text = "Requires Attunement " + m['reqAttune']
+            headings.append("({})".format(attunement.text))
+
+    if 'dmg1' in m:
+        dmg1 = ET.SubElement(itm, 'dmg1')
+        dmg1.text = utils.remove5eShit(m['dmg1'])
+
+
+    if 'dmg2' in m:
+        dmg2 = ET.SubElement(itm, 'dmg2')
+        dmg2.text = utils.remove5eShit(m['dmg2'])
+
+    if 'dmgType' in m:
+        dmgType = ET.SubElement(itm, 'dmgType')
+        if m['dmgType'] == 'O':
+            dmgType.text = 'FC'
+        elif m['dmgType'] == 'I':
+            dmgType.text = 'PS'
         else:
-            attunement.text = "Requires Attunement " + m['reqAttune']
-        headings.append("({})".format(attunement.text))
+            dmgType.text = m['dmgType']
 
-    dmg1 = ET.SubElement(itm, 'dmg1')
-    if 'dmg1' in m: dmg1.text = utils.remove5eShit(m['dmg1'])
+    if 'range' in m:
+        rng = ET.SubElement(itm, 'range')
+        rng.text = m['range']
 
-    dmg2 = ET.SubElement(itm, 'dmg2')
-    if 'dmg2' in m: dmg2.text = utils.remove5eShit(m['dmg2'])
 
-    dmgType = ET.SubElement(itm, 'dmgType')
-    if 'dmgType' in m: dmgType.text = m['dmgType']
+    if 'ac' in m:
+        ac = ET.SubElement(itm, 'ac')
+        ac.text = str(m['ac'])
 
-    rng = ET.SubElement(itm, 'range')
-    if 'range' in m: rng.text = m['range']
-
-    ac = ET.SubElement(itm, 'ac')
-    if 'ac' in m: ac.text = str(m['ac'])
+    if 'bonus' in m:
+        if 'type' in m and m['type'] in ['LA','MA','HA','S']:
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "ac {}".format(m['bonus'])
+        elif 'type' in m and m['type'] in ['M','R','A']:
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon attack {}".format(m['bonus'])
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon damage {}".format(m['bonus'])
+        elif 'staff' in m and m['staff']:
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon attack {}".format(m['bonus'])
+            bonus = ET.SubElement(itm, 'modifier', {"category":"bonus"})
+            bonus.text = "weapon damage {}".format(m['bonus'])
+        else:
+            print(m)
 
     if 'poison' in m and m['poison']:
         headings.append('Poison')
         if 'type' not in m:
             typ.text = 'G'
 
+
+    if 'entries' not in m:
+        m['entries'] = []
+
+    if 'resist' in m:
+        if m['type'] == "LA" or m['type'] == "MA" or m['type'] == "HA":
+            m['entries'].append("You have resistance to {} damage while you wear this armor.".format(m['resist']))
+        elif m['type'] == "RG":
+            m['entries'].append("You have resistance to {} damage while wearing this ring.".format(m['resist']))
+        elif m['type'] == "P":
+            m['entries'].append("When you drink this potion, you gain resistance to {} damage for 1 hour.".format(m['resist']))
+
+    if 'stealth' in m and m['stealth']:
+        m['entries'].append("The wearer has disadvantage on Stealth (Dexterity) checks.")
+
+    if 'strength' in m and m['type'] == "HA":
+        m['entries'].append("If the wearer has a Strength score lower than {}, their speed is reduced by 10 feet.".format(m['strength']))
+
     heading.text = ", ".join(headings)
+    
+    if args.nohtml:
+        try:
+            itm.remove(heading)
+        except:
+            pass
+
+    if 'items' in m:
+        if 'scfType' in m:
+            if m['scfType'] == "arcane":
+                m['entries'].insert(0,"An arcane focus is a special item–an orb, a crystal, a rod, a specially constructed staff, a wand-like length of wood, or some similar item–designed to channel the power of arcane spells. A sorcerer, warlock, or wizard can use such an item as a spellcasting focus.")
+            elif m['scfType'] == "druid":
+                m['entries'].insert(0,"A druidic focus might be a sprig of mistletoe or holly, a wand or scepter made of yew or another special wood, a staff drawn whole out of a living tree, or a totem object incorporating feathers, fur, bones, and teeth from sacred animals. A druid can use such an object as a spellcasting focus.")
+            elif m['scfType'] == "holy":
+                m['entries'].insert(0,"A holy symbol is a representation of a god or pantheon. It might be an amulet depicting a symbol representing a deity, the same symbol carefully engraved or inlaid as an emblem on a shield, or a tiny box holding a fragment of a sacred relic. A cleric or paladin can use a holy symbol as a spellcasting focus. To use the symbol in this way, the caster must hold it in hand, wear it visibly, or bear it on a shield.")
+        for i in m['items']:
+            if args.nohtml:
+                m['entries'].append(re.sub(r'^(.*?)(\|.*?)?$',r'\1',i))
+            else:
+                m['entries'].append(re.sub(r'^(.*?)(\|.*?)?$',r'<item>\1</item>',i))
+    elif 'scfType' in m:
+        if m['scfType'] == "arcane":
+            m['entries'].insert(0,"An arcane focus is a special item designed to channel the power of arcane spells. A sorcerer, warlock, or wizard can use such an item as a spellcasting focus.")
+        elif m['scfType'] == "druid":
+            m['entries'].insert(0,"A druid can use this object as a spellcasting focus.")
+        elif m['scfType'] == "holy":
+            m['entries'].insert(0,"A holy symbol is a representation of a god or pantheon.")
+            m['entries'].insert(1,"A cleric or paladin can use a holy symbol as a spellcasting focus. To use the symbol in this way, the caster must hold it in hand, wear it visibly, or bear it on a shield.")
+
+    if 'lootTables' in m:
+        if args.nohtml:
+            m['entries'].append("Found On: {}".format(", ".join(m['lootTables'])))
+        else:
+            m['entries'].append("<i>Found On: {}</i> ".format(", ".join(m['lootTables'])))
+
 
     if 'source' in m:
         slug = slugify(m["name"])
-        if os.path.isdir("./items/") and os.path.isdir("./img") and not os.path.isfile("./items/" + slug + ".jpg"):
-            artworkpath = None
-            if os.path.isfile("./img/items/" + m["name"] + ".jpg"):
-                artworkpath = "./img/items/" + m["name"] + ".jpg"
-            elif os.path.isfile("./img/items/" + m["name"] + ".png"):
-                artworkpath = "./img/items/" + m["name"] + ".png"
-            elif os.path.isfile("./img/items/" + m["source"] + "/" + m["name"] + ".png"):
-                artworkpath = "./img/items/" + m["source"] + "/" + m["name"] + ".png"
+        if args.addimgs and os.path.isdir("img") and not os.path.isfile(os.path.join(args.tempdir,"items", slug + ".png")) and not os.path.isfile(os.path.join(args.tempdir,"items",slug+".jpg")):
+            if not os.path.isdir(os.path.join(args.tempdir,"items")):
+                os.mkdir(os.path.join(args.tempdir,"items"))
+            if 'image' in m:
+                artworkpath = m['image']
+            else:
+                artworkpath = None
+            itemname = m["original_name"] if "original_name" in m else m["name"]
+            if artworkpath and os.path.isfile("./img/" + artworkpath):
+                artworkpath = "./img/" + artworkpath
+            elif os.path.isfile("./img/items/" + m["source"] + "/" + itemname + ".jpg"):
+                artworkpath = "./img/items/" + m["source"] + "/" + itemname + ".jpg"
+            elif os.path.isfile("./img/items/" + m["source"] + "/" + itemname + ".png"):
+                artworkpath = "./img/items/" + m["source"] + "/" + itemname + ".png"
+            elif os.path.isfile("./img/" + m["source"] + "/" + itemname + ".png"):
+                artworkpath = "./img/" + m["source"] + "/" + itemname + ".png"
             if artworkpath is not None:
-                if args.verbose:
-                    print("Converting Image: " + artworkpath)
-                with Image(filename=artworkpath) as img:
-                    img.format='jpeg'
-                    img.save(filename="./items/" + slug + ".jpg")
-                    imagetag = ET.SubElement(itm, 'image')
-                    imagetag.text = slug + ".jpg"
-        elif os.path.isfile("./items/" + slug + ".jpg"):
+                ext = os.path.splitext(artworkpath)[1]
+                copyfile(artworkpath, os.path.join(args.tempdir,"items",slug + ext))
+                imagetag = ET.SubElement(itm, 'image')
+                imagetag.text = slug + ext
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", slug + ".png")):
+            imagetag = ET.SubElement(itm, 'image')
+            imagetag.text = slug + ".png"
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", slug + ".jpg")):
             imagetag = ET.SubElement(itm, 'image')
             imagetag.text = slug + ".jpg"
 
-        allbooks = [ "./data/books.json", "./data/adventures.json" ]
-        srcfound = True
-        if m["source"] == "TftYP":
-            m["source"] = "Tales from the Yawning Portal"
-        elif m["source"] == "PSA":
-            m["source"] = "Plane Shift: Amonkhet"
-        elif m["source"] == "PSD":
-            m["source"] = "Plane Shift: Dominaria"
-        elif m["source"] == "PSI":
-            m["source"] = "Plane Shift: Innistrad"
-        elif m["source"] == "PSK":
-            m["source"] = "Plane Shift: Kaladesh"
-        elif m["source"] == "PSX":
-            m["source"] = "Plane Shift: Ixalan"
-        elif m["source"] == "PSZ":
-            m["source"] = "Plane Shift: Zendikar"
-        elif m["source"] == "Mag":
-            m["source"] = "Dragon Magazine"
-        elif m["source"] == "MFF":
-            m["source"] = "Mordenkainen’s Fiendish Folio"
-        elif m["source"] == "Stream":
-            m["source"] = "Livestream"
-        elif m["source"].startswith("UA"):
-            m["source"] = re.sub(r"(\w)([A-Z])", r"\1 \2", m["source"])
-            m["source"] = re.sub(r"U A", r"Unearthed Arcana: ", m["source"])
-        else:
-            srcfound = False
-        for books in allbooks:
-            if srcfound:
-                break
-            try:
-                with open(books) as f:
-                    bks = json.load(f)
-                    f.close()
-                key = list(bks.keys())[0]
-                for bk in bks[key]:
-                    if bk['source'] == m['source']:
-                        m["source"] = bk['name']
-                        srcfound = True
-                        break
-            except IOError as e:
-                if args.verbose:
-                    print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-        if not srcfound and args.verbose:
-            print("Could not find source: " + m['source'])
-        source = ET.SubElement(itm, 'source')
-        source.text = "{} p. {}".format(
-            m['source'], m['page']) if 'page' in m and m['page'] != 0 else m['source']
+        #source = ET.SubElement(itm, 'source')
+        sourcetext = "{} p. {}".format(
+            utils.getFriendlySource(m['source']), m['page']) if 'page' in m and m['page'] != 0 else utils.getFriendlySource(m['source'])
 
         if 'otherSources' in m and m["otherSources"] is not None:
-            allbooks = [ "./data/books.json", "./data/adventures.json" ]
-            srcfound = True
             for s in m["otherSources"]:
-                if "source" not in s:
-                    continue
-                if s["source"] == "TftYP":
-                    s["source"] = "Tales from the Yawning Portal"
-                elif s["source"] == "PSA":
-                    s["source"] = "Plane Shift: Amonkhet"
-                elif s["source"] == "PSD":
-                    s["source"] = "Plane Shift: Dominaria"
-                elif s["source"] == "PSI":
-                    s["source"] = "Plane Shift: Innistrad"
-                elif s["source"] == "PSK":
-                    s["source"] = "Plane Shift: Kaladesh"
-                elif s["source"] == "PSX":
-                    s["source"] = "Plane Shift: Ixalan"
-                elif s["source"] == "PSZ":
-                    s["source"] = "Plane Shift: Zendikar"
-                elif s["source"] == "Mag":
-                    s["source"] = "Dragon Magazine"
-                elif s["source"] == "MFF":
-                    s["source"] = "Mordenkainen’s Fiendish Folio"
-                elif s["source"] == "Stream":
-                    s["source"] = "Livestream"
-                elif s["source"].startswith("UA"):
-                    s["source"] = re.sub(r"(\w)([A-Z])", r"\1 \2", s["source"])
-                    s["source"] = re.sub(r"U A", r"Unearthed Arcana: ", s["source"])
-                else:
-                    srcfound = False
-                for books in allbooks:
-                    if srcfound:
-                        break
-                    try:
-                        with open(books) as f:
-                            bks = json.load(f)
-                            f.close()
-                        key = list(bks.keys())[0]
-                        for bk in bks[key]:
-                            if bk['source'] == s["source"]:
-                                s["source"] = bk['name']
-                                srcfound = True
-                                break
-                    except IOError as e:
-                        if args.verbose:
-                            print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-                if not srcfound and args.verbose:
-                    print("Could not find source: " + s["source"])
-                source.text += ", "
-                source.text += "{} p. {}".format(
-                    s["source"], s["page"]) if 'page' in s and s["page"] != 0 else s["source"]
+                sourcetext += ", "
+                sourcetext += "{} p. {}".format(
+                    utils.getFriendlySource(s["source"]), s["page"]) if 'page' in s and s["page"] != 0 else utils.getFriendlySource(s["source"])
         if 'entries' in m:
-            m['entries'].append("<i>Source: {}</i>".format(source.text))
+            if args.nohtml:
+                m['entries'].append("Source: {}".format(sourcetext))
+            else:
+                m['entries'].append("<i>Source: {}</i>".format(sourcetext))
         else:
-            m['entries'] = ["<i>Source: {}</i>".format(source.text)]
+            if args.nohtml:
+                m['entries'] = ["Source: {}".format(sourcetext)]
+            else:
+                m['entries'] = ["<i>Source: {}</i>".format(sourcetext)]
     bodyText = ET.SubElement(itm, 'text')
     bodyText.text = ""
 
@@ -341,31 +348,71 @@ def parseItem(m, compendium, args):
                                     r['roll']['max']) if 'min' in r['roll'] else str(
                                     r['roll']['exact']))
                         else:
-                            rowthing.append(utils.remove5eShit(str(r)))
+                            rowthing.append(utils.fixTags(str(r),m,args.nohtml))
                     bodyText.text += " | ".join(rowthing) + "\n"
             elif "entries" in e:
-                subentries = []                    
+                subentries = []
+                if 'name' in e:
+                    if args.nohtml:
+                        bodyText.text += "{}: ".format(e['name'])
+                    else:
+                        bodyText.text += "<b>{}:</b> ".format(e['name'])
                 for sube in e["entries"]:
                     if type(sube) == str:
-                        subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
+                        subentries.append(utils.fixTags(sube,m,args.nohtml))
                     elif type(sube) == dict and "text" in sube:
-                        subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
-                bodyText.text += "\n".join(subentries)
+                        subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
+                    elif type(sube) == dict and sube["type"] == "list" and "style" in sube and sube["style"] == "list-hang-notitle":
+                        for item in sube["items"]:
+                            if type(item) == dict and 'type' in item and item['type'] == 'item':
+                                if args.nohtml:
+                                    subentries.append("• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                                else:
+                                    subentries.append("• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                            else:
+                                subentries.append("• {}".format(utils.fixTags(item,m,args.nohtml)))
+                    elif type(sube) == dict and sube["type"] == "list":
+                        for item in sube["items"]:
+                            if type(item) == dict and "entries" in item:
+                                ssubentries = []                    
+                                for sse in item["entries"]:
+                                    if type(sse) == str:
+                                        ssubentries.append(utils.fixTags(sse,m,args.nohtml))
+                                    elif type(sse) == dict and "text" in sse:
+                                        ssubentries.append(utils.fixTags(sse["text"],m,args.nohtml))
+                                    subentries.append("\n".join(ssubentries))
+                            elif type(item) == dict and 'type' in item and item['type'] == 'item':
+                                if args.nohtml:
+                                    subentries.append("• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                                else:
+                                    subentries.append("• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)))
+                            else:
+                                subentries.append("• {}".format(utils.fixTags(item,m,args.nohtml)))
+                bodyText.text += "\n".join(subentries) + "\n"
             else:
                 if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
                     for item in e["items"]:
-                        bodyText.text += "{}: {}".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m))) + "\n"
+                        if args.nohtml:
+                            bodyText.text += "• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)) + "\n"
+                        else:
+                            bodyText.text += "• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml)) + "\n"
                 elif type(e) == dict and e["type"] == "list":
                     for item in e["items"]:
                         if "entries" in item:
                             subentries = []                    
                             for sube in item["entries"]:
                                 if type(sube) == str:
-                                    subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
+                                    subentries.append(utils.fixTags(sube,m,args.nohtml))
                                 elif type(sube) == dict and "text" in sube:
-                                    subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
-                                    bodyText.text += "\n".join(subentries) + "\n"
+                                    subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
+                                bodyText.text += "\n".join(subentries) + "\n"
                         else:
-                            bodyText.text += "{}".format(utils.remove5eShit(utils.fixTags(item,m))) + "\n"
+                            bodyText.text += "• {}".format(utils.fixTags(item,m,args.nohtml)) + "\n"
                 else:
-                    bodyText.text += utils.remove5eShit(utils.fixTags(e,m)) + "\n"
+                    bodyText.text += utils.fixTags(e,m,args.nohtml) + "\n"
+
+    bodyText.text = bodyText.text.rstrip()
+    for match in re.finditer(r'([0-9])+[dD]([0-9])+([ ]?[-+][ ]?[0-9]+)?',bodyText.text):
+        if not itm.find("./[roll='{}']".format(match.group(0))):
+            roll = ET.SubElement(itm, 'roll')
+            roll.text = "{}".format(match.group(0)).replace(' ','')

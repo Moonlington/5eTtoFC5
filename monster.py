@@ -1,3 +1,4 @@
+# vim: set tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab : #
 import xml.etree.cElementTree as ET
 import re
 import utils
@@ -5,7 +6,7 @@ import json
 import os
 import copy
 from slugify import slugify
-from wand.image import Image
+from shutil import copyfile
 
 def parseMonster(m, compendium, args):
     if '_copy' in m:
@@ -13,7 +14,7 @@ def parseMonster(m, compendium, args):
             print("COPY: " + m['name'] + " from " + m['_copy']['name'] + " in " + m['_copy']['source'])
         xtrsrc = "./data/bestiary/bestiary-" + m['_copy']['source'].lower() + ".json"
         try:
-            with open(xtrsrc) as f:
+            with open(xtrsrc,encoding='utf-8') as f:
                 d = json.load(f)
                 f.close()
             mcpy = copy.deepcopy(m)
@@ -23,7 +24,7 @@ def parseMonster(m, compendium, args):
                         if args.verbose:
                             print("ANOTHER COPY: " + mn['name'] + " from " + mn['_copy']['name'] + " in " + mn['_copy']['source'])
                         xtrsrc2 = "./data/bestiary/bestiary-" + mn['_copy']['source'].lower() + ".json"
-                        with open(xtrsrc2) as f:
+                        with open(xtrsrc2,encoding='utf-8') as f:
                             d2 = json.load(f)
                             f.close()
                         for mn2 in d2['monster']:
@@ -37,6 +38,14 @@ def parseMonster(m, compendium, args):
                     m['source'] = mcpy['source']
                     if "otherSources" in mcpy:
                         m["otherSources"] = mcpy["otherSources"]
+                    elif "otherSources" in m:
+                        del m["otherSources"]
+                    if 'size' in mcpy:
+                        m['size'] = mcpy['size']
+                    if 'hp' in mcpy:
+                        m['hp'] = mcpy['hp']
+                    if 'original_name' in mcpy:
+                        m['original_name'] = mcpy['original_name']
                     m['page'] = mcpy['page']
                     if '_mod' in mcpy['_copy']:
                         m = utils.modifyMonster(m,mcpy['_copy']['_mod'])
@@ -45,7 +54,7 @@ def parseMonster(m, compendium, args):
                 if args.verbose:
                     print("Adding extra traits for: " + mcpy['_copy']['_trait']['name'])
                 traits = "./data/bestiary/traits.json"
-                with open(traits) as f:
+                with open(traits,encoding='utf-8') as f:
                     d = json.load(f)
                     f.close()
                 for trait in d['trait']:
@@ -66,10 +75,10 @@ def parseMonster(m, compendium, args):
 #    for eachmonsters in compendium.findall('monster'):
 #        if eachmonsters.find('name').text == m['name']:
 #            m['name'] = "{} (DUPLICATE IN {})".format(m['name'],m['source'])
-
     monster = ET.SubElement(compendium, 'monster')
     name = ET.SubElement(monster, 'name')
     name.text = m['name']
+
     size = ET.SubElement(monster, 'size')
     size.text = m['size']
 
@@ -100,24 +109,53 @@ def parseMonster(m, compendium, args):
     acstr = []
     for acs in m['ac']:
         if isinstance(acs, dict):
-            if 'from' in acs:
-                acstr.append("{} ({})".format(
-                    acs['ac'], utils.remove5eShit(acs['from'][0])))
-            elif 'condition' in acs:
-                acstr.append("{} ({})".format(
-                    acs['ac'], utils.remove5eShit(acs['condition'])))
+            if len(acstr) == 0:
+                acstr.append(str(acs['ac']))
+                if 'from' in acs and 'condition' in acs:
+                    acstr.append(utils.fixTags(", ".join(acs['from']) + " " + acs['condition'],m,True))
+                elif 'from' in acs:
+                    acstr.append(utils.fixTags(", ".join(acs['from']),m,True))
+                elif 'condition' in acs:
+                    acstr.append(utils.fixTags(acs['condition'],m,True))
+                continue
+            acstr.append(utils.fixTags("{}".format(
+                "{} {}".format(
+                    acs['ac'],
+                    "("+", ".join(acs['from']) + ") " + acs['condition'] if 'from' in acs and 'condition' in acs else
+                    "("+", ".join(acs['from'])+")" if 'from' in acs else
+                    acs['condition']
+                    ) if 'from' in acs or 'condition' in acs else acs['ac']),m,True))
         else:
             acstr.append(str(acs))
-    ac.text = ", ".join(acstr)
+    ac.text = "{} ({})".format(acstr[0],", ".join(acstr[1:])) if len(acstr) > 1 else acstr[0]
 
     hp = ET.SubElement(monster, 'hp')
     if "special" in m['hp']:
-        hp.text = m['hp']['special']
+        if args.nohtml and re.match(r'equal the .*?\'s Constitution modifier',m['hp']['special']):
+            hp.text = str(utils.getAbilityMod(m['con']))
+            if 'trait' in m:
+                m['trait'].insert(0,{"name": "Hit Points","entries": [ m['hp']['special'] ]})
+            else:
+                m['trait'] = [ {"name": "Hit Points","entries": [ m['hp']['special'] ]} ]
+        elif args.nohtml:
+            hpmatch = re.match(r'[0-9]+ ?(\([0-9]+[Dd][0-9]+( ?\+ ?[0-9]+)?\))?', m['hp']['special'])
+            if hpmatch:
+                hp.text = str(hpmatch.group(0)).rstrip()
+            else:
+                hp.text = "0"
+            if 'trait' in m:
+                m['trait'].insert(0,{"name": "Hit Points","entries": [ m['hp']['special'] ]})
+            else:
+                m['trait'] = [ {"name": "Hit Points","entries": [ m['hp']['special'] ]} ]
+        else:
+            hp.text = m['hp']['special']
     else:
-        hp.text = "{} ({})".format(m['hp']['average'], m['hp']['formula'])
+        hp.text = "{} ({})".format(m['hp']['average'], m['hp']['formula'].replace(' ',''))
 
     speed = ET.SubElement(monster, 'speed')
-    if 'choose' in m['speed']:
+    if type(m['speed']) == str:
+        speed.text = m['speed']
+    elif 'choose' in m['speed']:
         lis = []
         for key, value in m['speed'].items():
             if key == "walk":
@@ -156,7 +194,9 @@ def parseMonster(m, compendium, args):
     statwis.text = str(m['wis'])
     statcha = ET.SubElement(monster, 'cha')
     statcha.text = str(m['cha'])
-
+    if 'isNpc' in m and m['isNpc'] and not args.nohtml:
+        npcroll = ET.SubElement(monster, 'role')
+        npcroll.text = "ally"
     save = ET.SubElement(monster, 'save')
     if 'save' in m:
         save.text = ", ".join(["{} {}".format(str.capitalize(
@@ -164,11 +204,24 @@ def parseMonster(m, compendium, args):
 
     skill = ET.SubElement(monster, 'skill')
     if 'skill' in m:
-        skill.text = ", ".join(["{} {}".format(str.capitalize(
-            key), value) for key, value in m['skill'].items()])
+        skills = []
+        for key, value in m['skill'].items():
+            if type(value) == str:
+                skills.append("{} {}".format(str.capitalize(key), value))
+            else:
+                if key == "other":
+                    for sk in value:
+                        if "oneOf" in sk:
+                            if args.nohtml:
+                                if 'trait' not in m: m['trait'] = []
+                                m['trait'].insert(0,{"name": "Skills","entries": [ "plus one of the following: "+", ".join(["{} {}".format(str.capitalize(ook), oov) for ook, oov in sk["oneOf"].items()]) ] })
+                            else:
+                                skills.append("plus one of the following: "+", ".join(["{} {}".format(str.capitalize(ook), oov) for ook, oov in sk["oneOf"].items()]))
+        skill.text = ", ".join(skills)
 
-    passive = ET.SubElement(monster, 'passive')
-    passive.text = str(m['passive'])
+    if 'passive' in m:
+        passive = ET.SubElement(monster, 'passive')
+        passive.text = str(m['passive'])
 
     languages = ET.SubElement(monster, 'languages')
     if 'languages' in m:
@@ -179,7 +232,8 @@ def parseMonster(m, compendium, args):
         if isinstance(m['cr'], dict):
             cr.text = str(m['cr']['cr'])
         else:
-            cr.text = str(m['cr'])
+            if not m['cr'] == "Unknown":
+                cr.text = str(m['cr'])
 
     resist = ET.SubElement(monster, 'resist')
     if 'resist' in m:
@@ -207,128 +261,53 @@ def parseMonster(m, compendium, args):
 
     if 'source' in m:
         slug = slugify(m["name"])
-        if os.path.isdir("./monsters/") and os.path.isdir("./img") and not os.path.isfile("./monsters/" + slug + ".jpg"):
-            artworkpath = None
-            if os.path.isfile("./img/bestiary/" + m["source"] + "/" + m["name"] + ".jpg"):
-                artworkpath = "./img/bestiary/" + m["source"] + "/" + m["name"] + ".jpg"
-            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + m["name"] + ".png"):
-                artworkpath = "./img/bestiary/" + m["source"] + "/" + m["name"] + ".png"
-            elif os.path.isfile("./img/" + m["source"] + "/" + m["name"] + ".png"):
-                artworkpath = "./img/" + m["source"] + "/" + m["name"] + ".png"
+        if args.addimgs and os.path.isdir("img") and not os.path.isfile(os.path.join(args.tempdir,"monsters", slug + ".png")) and not os.path.isfile(os.path.join(args.tempdir,"monsters",slug+".jpg")):
+            if not os.path.isdir(os.path.join(args.tempdir,"monsters")):
+                os.mkdir(os.path.join(args.tempdir,"monsters"))
+            if 'image' in m:
+                artworkpath = m['image']
+            else:
+                artworkpath = None
+            monstername = m["original_name"] if "original_name" in m else m["name"]
+            if artworkpath and os.path.isfile("./img/" + artworkpath):
+                artworkpath = "./img/" + artworkpath
+            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + monstername + ".jpg"):
+                artworkpath = "./img/bestiary/" + m["source"] + "/" + monstername + ".jpg"
+            elif os.path.isfile("./img/bestiary/" + m["source"] + "/" + monstername + ".png"):
+                artworkpath = "./img/bestiary/" + m["source"] + "/" + monstername + ".png"
+            elif os.path.isfile("./img/" + m["source"] + "/" + monstername + ".png"):
+                artworkpath = "./img/" + m["source"] + "/" + monstername + ".png"
             if artworkpath is not None:
-                with Image(filename=artworkpath) as img:
-                    img.format='jpeg'
-                    img.save(filename="./monsters/" + slug + ".jpg")
-                    imagetag = ET.SubElement(monster, 'image')
-                    imagetag.text = slug + ".jpg"
-        elif os.path.isfile("./monsters/" + slug + ".jpg"):
+                ext = os.path.splitext(artworkpath)[1]
+                copyfile(artworkpath, os.path.join(args.tempdir,"monsters",slug + ext))
+                imagetag = ET.SubElement(monster, 'image')
+                imagetag.text = slug + ext
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"monsters", slug + ".png")):
+            imagetag = ET.SubElement(monster, 'image')
+            imagetag.text = slug + ".png"
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"monsters", slug + ".jpg")):
             imagetag = ET.SubElement(monster, 'image')
             imagetag.text = slug + ".jpg"
 
-        allbooks = [ "./data/books.json", "./data/adventures.json" ]
-        srcfound = True
-        if m["source"] == "TftYP":
-            m["source"] = "Tales from the Yawning Portal"
-        elif m["source"] == "PSA":
-            m["source"] = "Plane Shift: Amonkhet"
-        elif m["source"] == "PSD":
-            m["source"] = "Plane Shift: Dominaria"
-        elif m["source"] == "PSI":
-            m["source"] = "Plane Shift: Innistrad"
-        elif m["source"] == "PSK":
-            m["source"] = "Plane Shift: Kaladesh"
-        elif m["source"] == "PSX":
-            m["source"] = "Plane Shift: Ixalan"
-        elif m["source"] == "PSZ":
-            m["source"] = "Plane Shift: Zendikar"
-        elif m["source"] == "Mag":
-            m["source"] = "Dragon Magazine"
-        elif m["source"] == "MFF":
-            m["source"] = "Mordenkainen’s Fiendish Folio"
-        elif m["source"] == "Stream":
-            m["source"] = "Livestream"
-        elif m["source"].startswith("UA"):
-            m["source"] = re.sub(r"(\w)([A-Z])", r"\1 \2", m["source"])
-            m["source"] = re.sub(r"U A", r"Unearthed Arcana: ", m["source"])
-        else:
-            srcfound = False
-        for books in allbooks:
-            if srcfound:
-                break
-            try:
-                with open(books) as f:
-                    bks = json.load(f)
-                    f.close()
-                key = list(bks.keys())[0]
-                for bk in bks[key]:
-                    if bk['source'] == m['source']:
-                        m["source"] = bk['name']
-                        srcfound = True
-                        break
-            except IOError as e:
-                if args.verbose:
-                    print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-        if not srcfound and args.verbose:
-            print("Could not find source: " + m['source'])
-        trait = ET.SubElement(monster, 'trait')
-        name = ET.SubElement(trait, 'name')
-        name.text = "Source"
-        text = ET.SubElement(trait, 'text')
-        text.text = "{} p. {}".format(
-            m['source'], m['page']) if 'page' in m and m['page'] != 0 else m['source']
+        sourcetext = "{} p. {}".format(
+            utils.getFriendlySource(m['source']), m['page']) if 'page' in m and m['page'] != 0 else utils.getFriendlySource(m['source'])
 
         if 'otherSources' in m and m["otherSources"] is not None:
-            allbooks = [ "./data/books.json", "./data/adventures.json" ]
-            srcfound = True
             for s in m["otherSources"]:
                 if "source" not in s:
                     continue
-                if s["source"] == "TftYP":
-                    s["source"] = "Tales from the Yawning Portal"
-                elif s["source"] == "PSA":
-                    s["source"] = "Plane Shift: Amonkhet"
-                elif s["source"] == "PSD":
-                    s["source"] = "Plane Shift: Dominaria"
-                elif s["source"] == "PSI":
-                    s["source"] = "Plane Shift: Innistrad"
-                elif s["source"] == "PSK":
-                    s["source"] = "Plane Shift: Kaladesh"
-                elif s["source"] == "PSX":
-                    s["source"] = "Plane Shift: Ixalan"
-                elif s["source"] == "PSZ":
-                    s["source"] = "Plane Shift: Zendikar"
-                elif s["source"] == "Mag":
-                    s["source"] = "Dragon Magazine"
-                elif s["source"] == "MFF":
-                    s["source"] = "Mordenkainen’s Fiendish Folio"
-                elif s["source"] == "Stream":
-                    s["source"] = "Livestream"
-                elif s["source"].startswith("UA"):
-                    s["source"] = re.sub(r"(\w)([A-Z])", r"\1 \2", s["source"])
-                    s["source"] = re.sub(r"U A", r"Unearthed Arcana: ", s["source"])
-                else:
-                    srcfound = False
-                for books in allbooks:
-                    if srcfound:
-                        break
-                    try:
-                        with open(books) as f:
-                            bks = json.load(f)
-                            f.close()
-                        key = list(bks.keys())[0]
-                        for bk in bks[key]:
-                            if bk['source'] == s["source"]:
-                                s["source"] = bk['name']
-                                srcfound = True
-                                break
-                    except IOError as e:
-                        if args.verbose:
-                            print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-                if not srcfound and args.verbose:
-                    print("Could not find source: " + s["source"])
-                text.text += ", "
-                text.text += "{} p. {}".format(
-                    s["source"], s["page"]) if 'page' in s and s["page"] != 0 else s["source"]
+                sourcetext += ", "
+                sourcetext += "{} p. {}".format(
+                    utils.getFriendlySource(s["source"]), s["page"]) if 'page' in s and s["page"] != 0 else utils.getFriendlySource(s["source"])
+        #trait = ET.SubElement(monster, 'trait')
+        #name = ET.SubElement(trait, 'name')
+        #name.text = "Source"
+        #text = ET.SubElement(trait, 'text')
+        #text.text = sourcetext
+        #srctag = ET.SubElement(monster, 'source')
+        #srctag.text = sourcetext
+    else:
+        sourcetext = None
 
 
     if 'trait' in m:
@@ -351,7 +330,7 @@ def parseMonster(m, compendium, args):
                                         r['roll']['max']) if 'min' in r['roll'] else str(
                                         r['roll']['exact']))
                             else:
-                                rowthing.append(utils.remove5eShit(r))
+                                rowthing.append(utils.fixTags(r,m,args.nohtml))
                         text = ET.SubElement(trait, 'text')
                         text.text = " | ".join(rowthing)
                 elif "entries" in e:
@@ -359,28 +338,52 @@ def parseMonster(m, compendium, args):
                     subentries = []                    
                     for sube in e["entries"]:
                         if type(sube) == str:
-                            subentries.append(utils.remove5eShit(utils.fixTags(sube,m)))
+                            subentries.append(utils.fixTags(sube,m,args.nohtml))
                         elif type(sube) == dict and "text" in sube:
-                            subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                            subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                     text.text = "\n".join(subentries)
                 else:
                     if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
                         for item in e["items"]:
                             text = ET.SubElement(trait, 'text')
-                            text.text = "{}: {}".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
+                            if args.nohtml:
+                                text.text = "• {}: {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            else:
+                                text.text = "• <i>{}:</i> {}".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
                     elif type(e) == dict and e["type"] == "list":
                         for item in e["items"]:
                             text = ET.SubElement(trait, 'text')
-                            text.text = "{}".format(utils.remove5eShit(utils.fixTags(item,m)))
+                            text.text = "• {}".format(utils.fixTags(item,m,args.nohtml))
                     else:
                         text = ET.SubElement(trait, 'text')
-                        text.text = utils.remove5eShit(utils.fixTags(e,m))
+                        text.text = utils.fixTags(e,m,args.nohtml)
 
     if 'action' in m and m['action'] is not None:
         for t in m['action']:
             action = ET.SubElement(monster, 'action')
-            name = ET.SubElement(action, 'name')
-            name.text = utils.remove5eShit(t['name'])
+            if 'name' in t:
+                name = ET.SubElement(action, 'name')
+                name.text = utils.remove5eShit(t['name'])
+            if 'entries' not in t:
+                text = ET.SubElement(action, 'text')
+                if type(t) == dict and t["type"] == "list" and "style" in t and t["style"] == "list-hang-notitle":
+                    text.text = ""
+                    for item in t["items"]:
+                        if args.nohtml:
+                            text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                        else:
+                            text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                elif type(t) == dict and t["type"] == "list":
+                    text.text = ""
+                    for item in t["items"]:
+                        text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
+                else:
+                    text.text = utils.fixTags(t,m,args.nohtml)
+                    for match in re.finditer(r'{@hit \+?(.*?)}.*?{@damage (.*?)}',t):
+                        if match.group(1) and match.group(2):
+                            attack = ET.SubElement(action, 'attack')
+                            attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False).replace(' ',''),utils.fixTags(match.group(2),m,False).replace(' ',''))
+                continue
             for e in t['entries']:
                 if isinstance(e, dict):
                     if "colLabels" in e:
@@ -397,7 +400,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(action, 'text')
                             text.text = " | ".join(rowthing)
                     elif "entries" in e:
@@ -407,7 +410,7 @@ def parseMonster(m, compendium, args):
                             if type(sube) == str:
                                 subentries.append(utils.remove5eShit(sube))
                             elif type(sube) == dict and "text" in sube:
-                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                         text.text = "\n".join(subentries)
                     elif "items" in e:
                         text = ET.SubElement(action, 'text')
@@ -416,7 +419,12 @@ def parseMonster(m, compendium, args):
                             if type(sube) == str:
                                 subentries.append(utils.remove5eShit(sube))
                             elif type(sube) == dict and "text" in sube:
-                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
+                            elif type(sube) == dict and "name" in sube and "entry" in sube:
+                                if args.nohtml:
+                                    subentries.append("{}".format(utils.fixTags(sube["name"],m,args.nohtml)) + utils.fixTags(sube["entry"],m,args.nohtml))
+                                else:
+                                    subentries.append("<i>{}</i>".format(utils.fixTags(sube["name"],m,args.nohtml)) + utils.fixTags(sube["entry"],m,args.nohtml))
                         text.text = "\n".join(subentries)
                     else:
                         for i in e["items"]:
@@ -430,17 +438,22 @@ def parseMonster(m, compendium, args):
                 else:
                     text = ET.SubElement(action, 'text')
                     if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li><em>{}:</em> {}</li>".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
-                        text.text += "</ul>"
+                            if args.nohtml:
+                                text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            else:
+                                text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
                     elif type(e) == dict and e["type"] == "list":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li>{}</li>".format(utils.remove5eShit(utils.fixTags(item,m)))
-                        text.text += "</ul>"
+                            text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
                     else:
-                        text.text = utils.remove5eShit(utils.fixTags(e,m))
+                        text.text = utils.fixTags(e,m,args.nohtml)
+                        for match in re.finditer(r'{@hit \+?(.*?)}.*?{@damage (.*?)}',e):
+                            if match.group(1) and match.group(2):
+                                attack = ET.SubElement(action, 'attack')
+                                attack.text = "{}|{}|{}".format(utils.remove5eShit(t['name']),utils.fixTags(match.group(1),m,False).replace(' ',''),utils.fixTags(match.group(2),m,False).replace(' ',''))
 
 
 
@@ -465,7 +478,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(action, 'text')
                             text.text = " | ".join(rowthing)
                     elif "entries" in e:
@@ -475,7 +488,7 @@ def parseMonster(m, compendium, args):
                             if type(sube) == str:
                                 subentries.append(utils.remove5eShit(sube))
                             elif type(sube) == dict and "text" in sube:
-                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                         text.text = "\n".join(subentries)
                     elif "items" in e:
                         text = ET.SubElement(action, 'text')
@@ -484,7 +497,7 @@ def parseMonster(m, compendium, args):
                             if type(sube) == str:
                                 subentries.append(utils.remove5eShit(sube))
                             elif type(sube) == dict and "text" in sube:
-                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                         text.text = "\n".join(subentries)
                     else:
                         for i in e["items"]:
@@ -498,17 +511,18 @@ def parseMonster(m, compendium, args):
                 else:
                     text = ET.SubElement(action, 'text')
                     if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li><em>{}:</em> {}</li>".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
-                        text.text += "</ul>"
+                            if args.nohtml:
+                                text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            else:
+                                text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
                     elif type(e) == dict and e["type"] == "list":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li>{}</li>".format(utils.remove5eShit(utils.fixTags(item,m)))
-                        text.text += "</ul>"
+                            text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
                     else:
-                        text.text = utils.remove5eShit(utils.fixTags(e,m))
+                        text.text = utils.fixTags(e,m,args.nohtml)
 
     if 'variant' in m and m['variant'] is not None:
         for t in m['variant']:
@@ -531,7 +545,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(action, 'text')
                             text.text = " | ".join(rowthing)
                     elif "entries" in e:
@@ -547,7 +561,7 @@ def parseMonster(m, compendium, args):
                             if type(sube) == str:
                                 subentries.append(utils.remove5eShit(sube))
                             elif type(sube) == dict and "text" in sube:
-                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                         text.text = "\n".join(subentries)
                     elif "items" in e:
                         if "name" in e:
@@ -562,7 +576,7 @@ def parseMonster(m, compendium, args):
                             if type(sube) == str:
                                 subentries.append(utils.remove5eShit(sube))
                             elif type(sube) == dict and "text" in sube:
-                                subentries.append(utils.remove5eShit(utils.fixTags(sube["text"],m)))
+                                subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
                         text.text = "\n".join(subentries)
                     elif e["type"] == "spellcasting":
                         scAction = ET.SubElement(monster, 'action')
@@ -581,6 +595,9 @@ def parseMonster(m, compendium, args):
                                 else:
                                     text = ET.SubElement(scAction, 'text')
                                     text.text = "{}/day: {}".format(k,", ".join(utils.remove5eShit(x) for x in e["daily"][k]))
+                        if "footerEntries" in e:
+                                text = ET.SubElement(scAction, 'text')
+                                text.text = "\n".join(utils.remove5eShit(x) for x in e["footerEntries"])
                     else:
                         print(e)
                         for i in e["entries"]:
@@ -594,20 +611,33 @@ def parseMonster(m, compendium, args):
                 else:
                     text = ET.SubElement(action, 'text')
                     if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li><em>{}:</em> {}</li>".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
-                        text.text += "</ul>"
+                            if args.nohtml:
+                                text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            else:
+                                text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
                     elif type(e) == dict and e["type"] == "list":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li>{}</li>".format(utils.remove5eShit(utils.fixTags(item,m)))
-                        text.text += "</ul>"
+                            text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
                     else:
-                        text.text = utils.remove5eShit(utils.fixTags(e,m))
+                        text.text = utils.fixTags(e,m,args.nohtml)
 
 
     if 'legendary' in m:
+        legendary = ET.SubElement(monster, 'legendary')
+
+        if "legendaryHeader" in m:
+            for h in m['legendaryHeader']:
+                text = ET.SubElement(legendary, 'text')
+                text.text = utils.remove5eShit(h)
+        else:
+            text = ET.SubElement(legendary, 'text')
+            if "isNamedCreature" in m and m['isNamedCreature']:
+                text.text = "{0} can take {1:d} legendary action{2}, choosing from the options below. Only one legendary action can be used at a time and only at the end of another creature's turn. {0} regains spent legendary action{2} at the start of its turn.".format(m['name'].split(' ', 1)[0],len(m['legendary']),"s" if len(m['legendary']) > 1 else "")
+            else:
+                text.text = "The {0} can take {1:d} legendary action{2}, choosing from the options below. Only one legendary action can be used at a time and only at the end of another creature's turn. The {0} regains spent legendary action{2} at the start of its turn.".format(m['type'] if type(m['type']) == str else "{} ({})".format(m['type']['type'],", ".join(m['type']['tags'])),len(m['legendary']),"s" if len(m['legendary']) > 1 else "")
         for t in m['legendary']:
             legendary = ET.SubElement(monster, 'legendary')
             name = ET.SubElement(legendary, 'name')
@@ -630,7 +660,7 @@ def parseMonster(m, compendium, args):
                                             r['roll']['max']) if 'min' in r['roll'] else str(
                                             r['roll']['exact']))
                                 else:
-                                    rowthing.append(utils.remove5eShit(r))
+                                    rowthing.append(utils.fixTags(r,m,args.nohtml))
                             text = ET.SubElement(legendary, 'text')
                             text.text = " | ".join(rowthing)
                     else:
@@ -641,17 +671,143 @@ def parseMonster(m, compendium, args):
                 else:
                     text = ET.SubElement(legendary, 'text')
                     if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li><em>{}:</em> {}</li>".format(item["name"],utils.remove5eShit(utils.fixTags(item["entry"],m)))
-                        text.text += "</ul>"
+                            if args.nohtml:
+                                text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            else:
+                                text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
                     elif type(e) == dict and e["type"] == "list":
-                        text.text = "<ul>"
+                        text.text = ""
                         for item in e["items"]:
-                            text.text += "<li>{}</li>".format(utils.remove5eShit(utils.fixTags(item,m)))
-                        text.text += "</ul>"
+                            text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
                     else:
-                        text.text = utils.remove5eShit(utils.fixTags(e,m))
+                        text.text = utils.fixTags(e,m,args.nohtml)
+
+    if 'legendaryGroup' in m:
+        with open("./data/bestiary/meta.json",encoding='utf-8') as f:
+            meta = json.load(f)
+            f.close()
+        for l in meta['legendaryGroup']:
+            if l['name'] != m['legendaryGroup']['name']:
+                continue
+            if 'lairActions' in l:
+                legendary = ET.SubElement(monster, 'legendary')
+                name = ET.SubElement(legendary, 'name')
+                name.text = "Lair Actions"
+                for t in l['lairActions']:
+                    if type(t) == str:
+                        text = ET.SubElement(legendary, 'text')
+                        text.text = utils.fixTags(t,m,args.nohtml)
+                        continue
+                    if 'name' in t:
+                        name = ET.SubElement(legendary, 'name')
+                        name.text = "Lair Action: " + utils.remove5eShit(t['name'])
+                    if t['type'] == 'list':
+                        for i in t['items']:
+                            text = ET.SubElement(legendary, 'text')
+                            text.text = "• " + utils.fixTags(i,m,args.nohtml)
+                        continue
+                    #legendary = ET.SubElement(monster, 'legendary')
+                    for e in t['entries']:
+                        if isinstance(e, dict):
+                            if "colLabels" in e:
+                                text = ET.SubElement(legendary, 'text')
+                                text.text = " | ".join(
+                                    [utils.remove5eShit(x) for x in e['colLabels']])
+                                for row in e['rows']:
+                                    rowthing = []
+                                    for r in row:
+                                        if isinstance(r, dict) and 'roll' in r:
+                                            rowthing.append(
+                                                "{}-{}".format(
+                                                    r['roll']['min'],
+                                                    r['roll']['max']) if 'min' in r['roll'] else str(
+                                                    r['roll']['exact']))
+                                        else:
+                                            rowthing.append(utils.fixTags(r,m,args.nohtml))
+                                    text = ET.SubElement(legendary, 'text')
+                                    text.text = " | ".join(rowthing)
+                            else:
+                                for i in e["items"]:
+                                    text = ET.SubElement(legendary, 'text')
+                                    text.text = "{} {}".format(
+                                        i['name'], utils.remove5eShit(i['entry']))
+                        else:
+                            text = ET.SubElement(legendary, 'text')
+                            if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
+                                text.text = ""
+                                for item in e["items"]:
+                                    if args.nohtml:
+                                        text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                                    else:
+                                        text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            elif type(e) == dict and e["type"] == "list":
+                                text.text = ""
+                                for item in e["items"]:
+                                    text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
+                            else:
+                                text.text = utils.fixTags(e,m,args.nohtml)
+
+            if 'regionalEffects' in l:
+                legendary = ET.SubElement(monster, 'legendary')
+                name = ET.SubElement(legendary, 'name')
+                name.text = "Regional Effects"
+                for t in l['regionalEffects']:
+                    if type(t) == str:
+                        text = ET.SubElement(legendary, 'text')
+                        text.text = utils.fixTags(t,m,args.nohtml)
+                        continue
+                    if 'name' in t:
+                        name = ET.SubElement(legendary, 'name')
+                        name.text = "Regional Effect: " + utils.remove5eShit(t['name'])
+                    if t['type'] == 'list':
+                        for i in t['items']:
+                            text = ET.SubElement(legendary, 'text')
+                            text.text = "• " + utils.fixTags(i,m,args.nohtml)
+                        continue
+                    #legendary = ET.SubElement(monster, 'legendary')
+                    for e in t['entries']:
+                        if isinstance(e, dict):
+                            if "colLabels" in e:
+                                text = ET.SubElement(legendary, 'text')
+                                text.text = " | ".join(
+                                    [utils.remove5eShit(x) for x in e['colLabels']])
+                                for row in e['rows']:
+                                    rowthing = []
+                                    for r in row:
+                                        if isinstance(r, dict) and 'roll' in r:
+                                            rowthing.append(
+                                                "{}-{}".format(
+                                                    r['roll']['min'],
+                                                    r['roll']['max']) if 'min' in r['roll'] else str(
+                                                    r['roll']['exact']))
+                                        else:
+                                            rowthing.append(utils.fixTags(r,m,args.nohtml))
+                                    text = ET.SubElement(legendary, 'text')
+                                    text.text = " | ".join(rowthing)
+                            else:
+                                for i in e["items"]:
+                                    text = ET.SubElement(legendary, 'text')
+                                    text.text = "{} {}".format(
+                                        i['name'], utils.remove5eShit(i['entry']))
+                        else:
+                            text = ET.SubElement(legendary, 'text')
+                            if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
+                                text.text = ""
+                                for item in e["items"]:
+                                    if args.nohtml:
+                                        text.text += "• {}: {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                                    else:
+                                        text.text += "• <i>{}:</i> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            elif type(e) == dict and e["type"] == "list":
+                                text.text = ""
+                                for item in e["items"]:
+                                    text.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
+                            else:
+                                text.text = utils.fixTags(e,m,args.nohtml)
+
+
 
     if 'spellcasting' in m:
         spells = []
@@ -661,7 +817,7 @@ def parseMonster(m, compendium, args):
             name.text = utils.remove5eShit(s['name'])
             for e in s['headerEntries']:
                 text = ET.SubElement(trait, 'text')
-                text.text = utils.remove5eShit(utils.fixTags(e,m))
+                text.text = utils.fixTags(e,m,args.nohtml)
 
             if "will" in s:
                 text = ET.SubElement(trait, 'text')
@@ -681,7 +837,7 @@ def parseMonster(m, compendium, args):
                     t = "{}/day{}: ".format(timeframe[0],
                                             " each" if len(timeframe) > 1 else "")
                     text.text = t + \
-                        ", ".join([utils.remove5eShit(utils.fixTags(e,m)) for e in dailyspells])
+                        ", ".join([utils.fixTags(e,m,args.nohtml) for e in dailyspells])
                     for spl in dailyspells:
                         search = re.search(
                             r'{@spell+ (.*?)(\|.*)?}', spl, re.IGNORECASE)
@@ -701,7 +857,7 @@ def parseMonster(m, compendium, args):
                         slots.append(
                             str(obj['slots'] if 'slots' in obj else 0))
                     text.text = t + \
-                        ", ".join([utils.remove5eShit(utils.fixTags(e,m)) for e in spellbois])
+                        ", ".join([utils.fixTags(e,m,args.nohtml) for e in spellbois])
                     for spl in spellbois:
                         search = re.search(
                             r'{@spell+ (.*?)(\|.*)?}', spl, re.IGNORECASE)
@@ -709,10 +865,70 @@ def parseMonster(m, compendium, args):
                             spells.append(search.group(1))
                 slotse = ET.SubElement(monster, 'slots')
                 slotse.text = ", ".join(slots)
+            if 'footerEntries' in s:
+                for e in s['footerEntries']:
+                    text = ET.SubElement(trait, 'text')
+                    text.text = utils.fixTags(e,m,args.nohtml)
 
         spellse = ET.SubElement(monster, 'spells')
         spellse.text = ", ".join(spells)
 
+    description = ET.SubElement(monster, 'description')
+    description.text = ""
+    if 'entries' in m:
+       for t in m['entries']:
+            if type(t) == str:
+                description.text += utils.fixTags(t,m,args.nohtml) + "\n"
+                continue
+            if 'name' in t:
+                description.text += "<b>{}:</b>\n".format(utils.remove5eShit(t['name']))
+            if 'entries' in t:
+                for e in t['entries']:
+                    if isinstance(e, dict):
+                        if "colLabels" in e:
+                            description.text += " | ".join(
+                                [utils.remove5eShit(x) for x in e['colLabels']]) + "\n"
+                            for row in e['rows']:
+                                rowthing = []
+                                for r in row:
+                                    if isinstance(r, dict) and 'roll' in r:
+                                        rowthing.append(
+                                            "{}-{}".format(
+                                                r['roll']['min'],
+                                                r['roll']['max']) if 'min' in r['roll'] else str(
+                                                r['roll']['exact']))
+                                    else:
+                                        rowthing.append(utils.fixTags(r,m,args.nohtml))
+                                description.text += " | ".join(rowthing) + "\n"
+                        elif "entries" in e:
+                            subentries = []                    
+                            for sube in e["entries"]:
+                                if type(sube) == str:
+                                    subentries.append(utils.fixTags(sube,m,args.nohtml))
+                                elif type(sube) == dict and "text" in sube:
+                                    subentries.append(utils.fixTags(sube["text"],m,args.nohtml))
+                            description.text += "\n".join(subentries)
+                        elif "items" in e:
+                            description.text += "\n".join([utils.fixTags(x,m,args.nohtml) for x in e["items"]])
+                        else:
+                            description.text += "{}".format(utils.fixTags(e,m,args.nohtml))
+                        description.text += "\n"
+                    else:
+                        if type(e) == dict and e["type"] == "list" and "style" in e and e["style"] == "list-hang-notitle":
+                            for item in e["items"]:
+                                description.text += "• <b>{}:</b> {}\n".format(item["name"],utils.fixTags(item["entry"],m,args.nohtml))
+                            description.text += "\n"
+                        elif type(e) == dict and e["type"] == "list":
+                            for item in e["items"]:
+                                description.text += "• {}\n".format(utils.fixTags(item,m,args.nohtml))
+                            description.text += "\n"
+                        else:
+                            description.text += utils.fixTags(e,m,args.nohtml)
+                            description.text += "\n"
+
+    description.text += "<i>Source: {}</i>".format(sourcetext)
+    if args.nohtml:
+        description.text = re.sub('</?(i|b|spell)>', '', description.text)
     environment = ET.SubElement(monster, 'environment')
     if 'environment' in m:
         environment.text = ", ".join([x for x in m['environment']])
