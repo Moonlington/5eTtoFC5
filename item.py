@@ -4,7 +4,6 @@ import re
 import utils
 import json
 import os
-from slugify import slugify
 from shutil import copyfile
 
 def parseItem(m, compendium, args):
@@ -101,14 +100,17 @@ def parseItem(m, compendium, args):
 
     if 'value' in m:
         value = ET.SubElement(itm, 'value')
-        if args.nohtml:
-            value.text = str(m['value']/100)
-        elif m['value'] >= 100:
-            value.text = "{:g} gp".format(m['value']/100)
-        elif m['value'] >= 10:
-            value.text = "{:g} sp".format(m['value']/10)
+        if type(m['value']) == str:
+            value.text = m['value']
         else:
-            value.text = "{:g} cp".format(m['value'])
+            if args.nohtml:
+                value.text = str(m['value']/100)
+            elif m['value'] >= 100:
+                value.text = "{:g} gp".format(m['value']/100)
+            elif m['value'] >= 10:
+                value.text = "{:g} sp".format(m['value']/10)
+            else:
+                value.text = "{:g} cp".format(m['value'])
 
     prop = ET.SubElement(itm, 'property')
     if 'property' in m: prop.text = ",".join(m['property'])
@@ -281,8 +283,8 @@ def parseItem(m, compendium, args):
 
 
     if 'source' in m:
-        slug = slugify(m["name"])
-        if args.addimgs and os.path.isdir("img") and not os.path.isfile(os.path.join(args.tempdir,"items", slug + ".png")) and not os.path.isfile(os.path.join(args.tempdir,"items",slug+".jpg")):
+        name = m["name"]
+        if args.addimgs and os.path.isdir("img") and not os.path.isfile(os.path.join(args.tempdir,"items", name + ".png")) and not os.path.isfile(os.path.join(args.tempdir,"items",name+".jpg")):
             if not os.path.isdir(os.path.join(args.tempdir,"items")):
                 os.mkdir(os.path.join(args.tempdir,"items"))
             if 'image' in m:
@@ -300,15 +302,15 @@ def parseItem(m, compendium, args):
                 artworkpath = "./img/" + m["source"] + "/" + itemname + ".png"
             if artworkpath is not None:
                 ext = os.path.splitext(artworkpath)[1]
-                copyfile(artworkpath, os.path.join(args.tempdir,"items",slug + ext))
+                copyfile(artworkpath, os.path.join(args.tempdir,"items",name + ext))
                 imagetag = ET.SubElement(itm, 'image')
-                imagetag.text = slug + ext
-        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", slug + ".png")):
+                imagetag.text = name + ext
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", name + ".png")):
             imagetag = ET.SubElement(itm, 'image')
-            imagetag.text = slug + ".png"
-        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", slug + ".jpg")):
+            imagetag.text = name + ".png"
+        elif args.addimgs and os.path.isfile(os.path.join(args.tempdir,"items", name + ".jpg")):
             imagetag = ET.SubElement(itm, 'image')
-            imagetag.text = slug + ".jpg"
+            imagetag.text = name + ".jpg"
 
         #source = ET.SubElement(itm, 'source')
         sourcetext = "{} p. {}".format(

@@ -3,7 +3,6 @@ import re
 import math
 import copy
 import json
-from slugify import slugify
 
 def ordinal(n): return "%d%s" % (
     n, "tsnrhtdd"[(n / 10 % 10 != 1) * (n % 10 < 4) * n % 10::4])
@@ -21,25 +20,26 @@ def parseRIV(m, t):
 #                lis += parseRIV(r, 'resist')
             else:
                 riv = []
-                for x in r[t]:
-                    if isinstance(x, dict) and t in x:
-                        if len(riv) > 0:
-                            riv[-1] += "; {}{}{}".format(
-                                x['preNote'] +
-                                " " if 'preNote' in x else "",
-                                ", ".join(parseRIV(x, t)),
-                                " " +
-                                x['note'] if 'note' in x else "")
+                if t in r:
+                    for x in r[t]:
+                        if isinstance(x, dict) and t in x:
+                            if len(riv) > 0:
+                                riv[-1] += "; {}{}{}".format(
+                                    x['preNote'] +
+                                    " " if 'preNote' in x else "",
+                                    ", ".join(parseRIV(x, t)),
+                                    " " +
+                                    x['note'] if 'note' in x else "")
+                            else:
+                                riv.append(
+                                "{}{}{}".format(
+                                    x['preNote'] +
+                                    " " if 'preNote' in x else "",
+                                    ", ".join(parseRIV(x, t)),
+                                    " " +
+                                    x['note'] if 'note' in x else ""))
                         else:
-                            riv.append(
-                            "{}{}{}".format(
-                                x['preNote'] +
-                                " " if 'preNote' in x else "",
-                                ", ".join(parseRIV(x, t)),
-                                " " +
-                                x['note'] if 'note' in x else ""))
-                    else:
-                        riv.append(x)
+                            riv.append(x)
                 if len(lis) > 0:
                     lis[-1] += "; {}{}{}".format(
                             r['preNote'] +
@@ -477,7 +477,7 @@ def fixTags(s,m,nohtml=False):
         s = re.sub(r'{@spell (.*?)}', r'<spell>\1</spell>', s)
         s = re.sub(r'{@link (.*?)\|(.*?)?}', r'<a href="\2">\1</a>', s)
         def createMLink(matchobj):
-            return "<a href=\"/monster/{}\">{}</a>".format(slugify(matchobj.group(1)),matchobj.group(2))
+            return "<a href=\"/monster/{}\">{}</a>".format(matchobj.group(1),matchobj.group(2))
         s = re.sub(r'{@creature (.*?)\|\|(.*?)?}', createMLink, s)
         s = re.sub(r'{@creature (.*?)}', r'<monster>\1</monster>', s)
         s = re.sub(r'{@item (.*?)(\|.*?)?}', r'<item>\1</item>', s)
@@ -639,7 +639,8 @@ def getFriendlySource(source):
                     srcfound = True
                     break
         except IOError as e:
-            print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))
-    if not srcfound:
-        print("Could not find source: " + source)
+            continue
+            print ("Could not determine source friendly names ({}): {}".format(e.errno, e.strerror))    
+    # if not srcfound:
+    #     print("Could not find source: " + source)
     return friendly

@@ -4,7 +4,6 @@ import re
 import utils
 import json
 import os
-from slugify import slugify
 from wand.image import Image
 
 def parseRace(m, compendium, args):
@@ -45,8 +44,8 @@ def parseRace(m, compendium, args):
         m['entries'] = []
 
     if 'source' in m:
-        slug = slugify(m["name"])
-        if args.addimgs and os.path.isdir("./img") and not os.path.isfile("./items/" + slug + ".png"):
+        name = (m["name"])
+        if args.addimgs and os.path.isdir("./img") and not os.path.isfile("./items/" + name + ".png"):
             if not os.path.isdir("./items/"):
                 os.mkdir("./items/")
             artworkpath = None
@@ -61,12 +60,12 @@ def parseRace(m, compendium, args):
                     print("Converting Image: " + artworkpath)
                 with Image(filename=artworkpath) as img:
                     img.format='png'
-                    img.save(filename="./items/" + slug + ".png")
+                    img.save(filename="./items/" + name + ".png")
                     imagetag = ET.SubElement(race, 'image')
-                    imagetag.text = slug + ".png"
-        elif args.addimgs and os.path.isfile("./items/" + slug + ".png"):
+                    imagetag.text = name + ".png"
+        elif args.addimgs and os.path.isfile("./items/" + name + ".png"):
             imagetag = ET.SubElement(race, 'image')
-            imagetag.text = slug + ".png"
+            imagetag.text = name + ".png"
 
         #source = ET.SubElement(race, 'source')
         sourcetext = "{} p. {}".format(

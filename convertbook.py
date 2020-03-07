@@ -9,7 +9,6 @@ import shutil
 import argparse
 import uuid
 import copy
-from slugify import slugify
 import utils
 import time
 # Argument Parser
@@ -48,16 +47,16 @@ def fixTags(s):
     s = re.sub(r'{@spell (.*?)}', r'<spell>\1</spell>', s)
     s = re.sub(r'{@link (.*?)\|(.*?)?}', r'<a href="\2">\1</a>', s)
     def createMLinks(matchobj):
-        return "<a href=\"/monster/{}\">{}</a>".format(slugify(matchobj.group(1)),matchobj.group(2))
+        return "<a href=\"/monster/{}\">{}</a>".format(matchobj.group(1),matchobj.group(2))
     s = re.sub(r'{@creature (.*?)\|\|(.*?)?}', createMLinks, s)
     def createMLink(matchobj):
-        return "<a href=\"/monster/{}\">{}</a>".format(slugify(matchobj.group(1)),matchobj.group(1).title())
+        return "<a href=\"/monster/{}\">{}</a>".format(matchobj.group(1),matchobj.group(1).title())
     s = re.sub(r'{@creature (.*?)}', createMLink, s)
     def createILink(matchobj):
-        return "<a href=\"/item/{}\">{}</a>".format(slugify(matchobj.group(1)),matchobj.group(1).title())
+        return "<a href=\"/item/{}\">{}</a>".format(matchobj.group(1),matchobj.group(1).title())
     s = re.sub(r'{@item (.*?)(\|.*?)?}', createILink, s)
     def createCLink(matchobj):
-        return "<a href=\"/page/{}\">{}</a>".format(slugify(matchobj.group(1)),matchobj.group(1).title())
+        return "<a href=\"/page/{}\">{}</a>".format(matchobj.group(1),matchobj.group(1).title())
     s = re.sub(r'{@class (.*?)}', createCLink, s)
     s = re.sub(r'{@condition (.*?)}', createCLink, s)
 
@@ -83,7 +82,7 @@ def processSection(order,d,mod,parentuuid=None,parentname=None):
     else:
         content.text = "<h1>{}</h1>\n".format(d['name'])
     slug = ET.SubElement(page,'slug')
-    slug.text = slugify(d['name'])
+    slug.text = d['name']
     if d['name'] == "Classes" and args.book.lower() == 'phb':
         add_fluff = ['barbarian','bard','cleric','druid','fighter','monk','paladin','ranger','rogue','sorcerer','warlock','wizard']
         for fl in add_fluff:
@@ -538,9 +537,9 @@ def processSection(order,d,mod,parentuuid=None,parentname=None):
         else:
             content.text += "<p>{}</p>".format(fixTags(e))
     if parentname:
-        content.text += "<br>\n<a href=\"/page/{}\">{}</a>\n<br>\n".format(slugify(parentname),parentname)
+        content.text += "<br>\n<a href=\"/page/{}\">{}</a>\n<br>\n".format(parentname,parentname)
     content.text = content.text.rstrip()
-    return slugify(d['name'])
+    return d['name']
 
 def getEntry(e):
     if type(e) == dict:
@@ -659,7 +658,7 @@ for book in b['book']:
         f.close()
 
     module = ET.Element(
-        'module', { 'id': slugify(book["id"] + " " + book["name"]),'version': "{:.0f}".format(time.time()) } )
+        'module', { 'id': book["id"] + " " + book["name"],'version': "{:.0f}".format(time.time()) } )
     name = ET.SubElement(module, 'name')
     name.text = book['name']
     author = ET.SubElement(module, 'author')
@@ -672,7 +671,7 @@ for book in b['book']:
     image.text = os.path.basename(book['image'])
     shutil.copy("./img/" + book['image'],os.path.join(tempdir,os.path.basename(book['image'])))
     slug = ET.SubElement(module, 'slug')
-    slug.text = slugify(book['name'])
+    slug.text = book['name']
     description = ET.SubElement(module, 'description')
     description.text = "By {}\nPublished {}".format(book['author'],book['published'])
 

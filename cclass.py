@@ -4,7 +4,6 @@ import re
 import utils
 import json
 import os
-from slugify import slugify
 from wand.image import Image
 
 def parseClass(m, compendium, args):

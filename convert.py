@@ -367,8 +367,8 @@ for file in args.inputJSON:
                 m['original_name']=m['name']
                 m['name'] += " (Unearthed Arcana)"
             for xmlmon in compendium.findall("./monster[name='{}']".format(re.sub(r'\'','*',m['name']))):
-                if args.verbose or args.showdupe:
-                    print ("{0} in {1} is duplicate entry for {2} from {3}".format(m['name'],utils.getFriendlySource(m['source']),xmlmon.find('name').text,xmlmon.find('source').text))
+                # if args.verbose or args.showdupe:
+                #     print ("{0} in {1} is duplicate entry for {2} from {3}".format(m['name'],utils.getFriendlySource(m['source']),xmlmon.find('name').text,xmlmon.find('source').text))
                 mdupe += 1
             if fluff is not None and 'monster' in fluff:
                 if 'entries' in m:
